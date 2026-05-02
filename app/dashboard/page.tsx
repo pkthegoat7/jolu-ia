@@ -1,5 +1,8 @@
 'use client';
 
+// This page is kept for backwards compatibility.
+// The admin dashboard is now at /admin/dashboard.
+
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 

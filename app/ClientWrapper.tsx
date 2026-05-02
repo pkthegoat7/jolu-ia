@@ -1,56 +1,30 @@
 'use client';
-import { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
-import Image from "next/image";
+import { useEffect } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+
+const LEAD_PATHS = ['/analise', '/obrigado'];
+const ADMIN_PROTECTED = ['/admin/dashboard', '/admin/leads'];
 
 export default function ClientWrapper({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  const isLeadPath  = LEAD_PATHS.some(p => pathname.startsWith(p));
+  const isAdminAuth = ADMIN_PROTECTED.some(p => pathname.startsWith(p));
+  const isAdminLogin = pathname === '/admin';
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    setIsAuthenticated(Boolean(token));
+    const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
 
-    if (!token && pathname.startsWith("/dashboard")) {
-      router.push("/login");
-    } else if (token && pathname === "/login") {
-      router.push("/dashboard");
+    if (isAdminAuth && !token) {
+      router.push('/admin');
+    } else if (isAdminLogin && token) {
+      router.push('/admin/dashboard');
     }
-  }, [pathname, router]);
+  }, [pathname, router, isAdminAuth, isAdminLogin]);
 
-  const logout = () => {
-    localStorage.removeItem("access_token");
-    setIsAuthenticated(false);
-    router.push("/login");
-  };
+  // Lead pages and obrigado: render children directly, no chrome
+  if (isLeadPath) return <>{children}</>;
 
-  return (
-    <>
-      <nav className="sticky top-0 z-50 border-b border-[#0a376c] bg-[#072c57]">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
-          <div className="flex items-center">
-            <Image
-              src="/logo.png"
-              alt="Patrícia Elias"
-              width={200}
-              height={40}
-              className="h-10 w-auto object-contain"
-              priority
-            />
-          </div>
-
-        {isAuthenticated && (
-            <button
-              onClick={logout}
-              className="rounded-full border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-white/20"
-            >
-              Sair
-            </button>
-        )}
-        </div>
-      </nav>
-      {children}
-    </>
-  );
+  return <>{children}</>;
 }
