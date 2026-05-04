@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-
-export const maxDuration = 60;
 import { randomBytes } from 'crypto';
+import { Resend } from 'resend';
 import { prisma } from '@/lib/prisma';
 import { analisarImagem, uploadToSupabase, type ResultadoAnalise } from '@/lib/analise';
-import { Resend } from 'resend';
+
+export const maxDuration = 60;
 
 async function enviarEmailProtocolo(
   email: string,
