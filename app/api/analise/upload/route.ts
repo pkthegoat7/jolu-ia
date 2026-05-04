@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+
+export const maxDuration = 60;
 import { getAuthUser } from '@/lib/jwt';
 import { analisarImagem, uploadToSupabase } from '@/lib/analise';
 import { prisma } from '@/lib/prisma';
