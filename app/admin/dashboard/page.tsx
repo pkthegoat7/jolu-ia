@@ -31,11 +31,14 @@ export default function AdminDashboard() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'leads' | 'tokens'>('leads');
+  const [tab, setTab] = useState<'leads' | 'tokens' | 'config'>('leads');
   const [newCampanha, setNewCampanha] = useState('');
   const [newSlug, setNewSlug] = useState('');
   const [tokenBusy, setTokenBusy] = useState(false);
   const [search, setSearch] = useState('');
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [webhookBusy, setWebhookBusy] = useState(false);
+  const [webhookMsg, setWebhookMsg] = useState('');
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
 
@@ -48,22 +51,43 @@ export default function AdminDashboard() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [lRes, sRes, tRes] = await Promise.all([
+      const [lRes, sRes, tRes, cfgRes] = await Promise.all([
         authFetch(apiUrl(`/admin/leads?page=${page}&limit=30`)),
         authFetch(apiUrl('/admin/stats')),
         authFetch(apiUrl('/admin/tokens')),
+        authFetch(apiUrl('/admin/settings')),
       ]);
       const l = await lRes.json() as LeadsResp;
       const s = await sRes.json() as Stats;
       const t = await tRes.json() as Token[];
+      const cfg = await cfgRes.json() as { webhookUrl: string };
       setLeads(l.data ?? []);
       setTotal(l.total ?? 0);
       setStats(s);
       setTokens(Array.isArray(t) ? t : []);
+      setWebhookUrl(cfg.webhookUrl ?? '');
     } finally {
       setLoading(false);
     }
   }, [authFetch, page]);
+
+  const saveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setWebhookBusy(true);
+    setWebhookMsg('');
+    try {
+      await authFetch(apiUrl('/admin/settings'), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ webhookUrl: webhookUrl.trim() || null }),
+      });
+      setWebhookMsg('Configurações salvas com sucesso.');
+    } catch {
+      setWebhookMsg('Erro ao salvar.');
+    } finally {
+      setWebhookBusy(false);
+    }
+  };
 
   useEffect(() => { load(); }, [load]);
 
@@ -133,10 +157,10 @@ export default function AdminDashboard() {
 
         {/* Tabs */}
         <div className="flex gap-1 p-1 glass rounded-2xl w-fit">
-          {(['leads', 'tokens'] as const).map(t => (
+          {(['leads', 'tokens', 'config'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`rounded-xl px-5 py-2 text-[13px] font-semibold transition-all ${tab === t ? 'bg-white shadow-sm text-[#4a2435]' : 'text-[#9a7282] hover:text-[#4a2435]'}`}>
-              {t === 'leads' ? `Leads (${total})` : 'Campanhas'}
+              {t === 'leads' ? `Leads (${total})` : t === 'tokens' ? 'Campanhas' : 'Configurações'}
             </button>
           ))}
         </div>
@@ -298,6 +322,68 @@ export default function AdminDashboard() {
             )}
           </div>
         )}
+        {/* ── CONFIG TAB ── */}
+        {tab === 'config' && (
+          <div className="space-y-6 max-w-xl">
+            <div className="glass rounded-2xl p-6">
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#b8a0ac]">Webhook de Notificação</p>
+              <p className="mb-5 text-sm text-[#9a7282] leading-relaxed">
+                Quando uma análise for concluída, o sistema envia um <code className="bg-[#f3e8f0] text-[#7a3f56] rounded px-1.5 py-0.5 text-[11px]">POST</code> para esta URL com os dados do lead e o diagnóstico de pele.
+              </p>
+              <form onSubmit={saveSettings} className="space-y-4">
+                <div>
+                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8b3f5a]">
+                    URL do Webhook
+                  </label>
+                  <input
+                    type="url"
+                    placeholder="https://seu-sistema.com/webhook"
+                    value={webhookUrl}
+                    onChange={e => setWebhookUrl(e.target.value)}
+                    className="field w-full"
+                  />
+                  <p className="mt-1.5 text-[11px] text-[#b8a0ac]">
+                    Deixe em branco para desativar. Assine os payloads com <code className="bg-[#f3e8f0] text-[#7a3f56] rounded px-1 py-0.5">WEBHOOK_SECRET</code> nas variáveis de ambiente.
+                  </p>
+                </div>
+
+                {webhookMsg && (
+                  <div className={`flex gap-3 rounded-xl border px-4 py-3 ${webhookMsg.includes('Erro') ? 'border-red-100 bg-red-50/90' : 'border-emerald-100 bg-emerald-50/90'}`}>
+                    <p className={`text-sm ${webhookMsg.includes('Erro') ? 'text-red-700' : 'text-emerald-700'}`}>{webhookMsg}</p>
+                  </div>
+                )}
+
+                <button type="submit" disabled={webhookBusy}
+                  className="btn-brand rounded-2xl px-6 py-3 text-[13px] font-semibold disabled:opacity-55">
+                  {webhookBusy ? 'Salvando...' : 'Salvar configurações'}
+                </button>
+              </form>
+            </div>
+
+            <div className="glass rounded-2xl p-6">
+              <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#b8a0ac]">Exemplo de Payload</p>
+              <pre className="text-[11px] text-[#7a5060] bg-[#f7f0f3] rounded-xl p-4 overflow-x-auto leading-relaxed">{`{
+  "event": "lead.analyzed",
+  "timestamp": "2026-05-04T11:00:00Z",
+  "data": {
+    "lead": {
+      "nome": "Maria Silva",
+      "email": "maria@email.com",
+      "telefone": "(11) 99999-9999",
+      "campanha": "Instagram Mai/2026"
+    },
+    "analise": {
+      "tipoPele": "Mista",
+      "nivelOleosidade": "Media",
+      "nivelAcne": "Leve",
+      "recomendacoes": [...]
+    }
+  }
+}`}</pre>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );

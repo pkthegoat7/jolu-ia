@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { randomBytes } from 'crypto';
+import { randomBytes, createHmac } from 'crypto';
 import { Resend } from 'resend';
 import { prisma } from '@/lib/prisma';
 import { analisarImagem, uploadToSupabase, type ResultadoAnalise } from '@/lib/analise';
@@ -86,6 +86,43 @@ async function enviarEmailProtocolo(
   console.log(`[Email] Protocolo enviado para ${email}`);
 }
 
+async function dispararWebhook(
+  lead: { id: string; nome: string; email: string; telefone: string; desejaMelhorar: string; createdAt: Date },
+  campanha: string,
+  resultado: ResultadoAnalise,
+) {
+  const settings = await prisma.settings.findUnique({ where: { id: 'default' } });
+  if (!settings?.webhookUrl) return;
+
+  const payload = {
+    event: 'lead.analyzed',
+    timestamp: new Date().toISOString(),
+    data: {
+      lead: {
+        id: lead.id,
+        nome: lead.nome,
+        email: lead.email,
+        telefone: lead.telefone,
+        desejaMelhorar: lead.desejaMelhorar,
+        campanha,
+        criadoEm: lead.createdAt,
+      },
+      analise: resultado,
+    },
+  };
+
+  const body = JSON.stringify(payload);
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+
+  const secret = process.env.WEBHOOK_SECRET;
+  if (secret) {
+    headers['X-Jolu-Signature'] = `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`;
+  }
+
+  await fetch(settings.webhookUrl, { method: 'POST', headers, body });
+  console.log(`[Webhook] Disparado para ${settings.webhookUrl}`);
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -123,8 +160,14 @@ export async function POST(
       data: { leadId, imageUrl: publicUrl, resultado },
     });
 
+    const tokenInfo = await prisma.campaignToken.findUnique({ where: { id: lead.tokenId } });
+
     enviarEmailProtocolo(lead.email, lead.nome, resultado, registro.id).catch((err) =>
       console.error('[Email] Falha ao enviar protocolo:', err),
+    );
+
+    dispararWebhook(lead, tokenInfo?.campanha ?? '', resultado).catch((err) =>
+      console.error('[Webhook] Falha ao disparar:', err),
     );
 
     return NextResponse.json({ success: true });

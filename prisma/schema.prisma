@@ -90,6 +90,12 @@ model Lead {
   createdAt      DateTime      @default(now())
 }
 
+model Settings {
+  id         String   @id @default("default")
+  webhookUrl String?
+  updatedAt  DateTime @updatedAt
+}
+
 model LeadAnalise {
   id           String   @id @default(uuid())
   leadId       String   @unique
