@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { apiUrl } from '@/lib/api';
 
 const Ic = {
-  User: () => <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M20 21a8 8 0 1 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>,
   Mail: () => <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>,
   Lock: () => <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 1 1 8 0v3"/></svg>,
 };
@@ -26,63 +25,28 @@ function Field({ id, label, type, ph, val, set, Icon }: {
 }
 
 export default function AdminLoginPage() {
-  const [isReg, setIsReg] = useState(false);
-  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
-  const [conf, setConf] = useState('');
   const [error, setError] = useState('');
-  const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
   const router = useRouter();
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(''); setMsg('');
-
-    if (isReg) {
-      if (!name.trim()) { setError('Informe seu nome.'); return; }
-      if (pass.length < 6) { setError('Senha: mínimo 6 caracteres.'); return; }
-      if (pass !== conf) { setError('As senhas não coincidem.'); return; }
-    }
-
+    setError('');
     setBusy(true);
     try {
-      if (isReg) {
-        const r = await fetch(apiUrl('/auth/register'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email, password: pass }),
-        });
-        const d = await r.json() as { message?: string };
-        if (!r.ok) { setError(d.message ?? 'Erro ao criar conta.'); return; }
-        // Auto-login após cadastro
-        const lr = await fetch(apiUrl('/auth/login'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password: pass }),
-        });
-        const ld = await lr.json() as { access_token?: string };
-        if (lr.ok && ld.access_token) {
-          localStorage.setItem('access_token', ld.access_token);
-          router.push('/admin/dashboard');
-        } else {
-          setMsg('Conta criada! Faça login.');
-          setIsReg(false); setPass(''); setConf('');
-        }
+      const r = await fetch(apiUrl('/auth/login'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: pass }),
+        credentials: 'include',
+      });
+      const d = await r.json() as { message?: string };
+      if (r.ok) {
+        router.push('/admin/dashboard');
       } else {
-        const r = await fetch(apiUrl('/auth/login'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password: pass }),
-        });
-        const d = await r.json() as { access_token?: string; message?: string };
-        if (r.ok && d.access_token) {
-          localStorage.setItem('access_token', d.access_token);
-          router.push('/admin/dashboard');
-        } else {
-          setError(d.message ?? 'Credenciais inválidas.');
-        }
+        setError(d.message ?? 'Credenciais inválidas.');
       }
     } catch {
       setError('Erro ao conectar com o servidor.');
@@ -90,8 +54,6 @@ export default function AdminLoginPage() {
       setBusy(false);
     }
   };
-
-  const toggle = () => { setIsReg(p => !p); setError(''); setMsg(''); setPass(''); setConf(''); };
 
   return (
     <div className="flex min-h-screen">
@@ -163,29 +125,17 @@ export default function AdminLoginPage() {
             <div className="mb-3 inline-flex items-center gap-2 rounded-full px-4 py-1.5"
               style={{ background: 'linear-gradient(135deg,rgba(74,36,53,.07),rgba(192,120,152,.11))', border: '1px solid rgba(192,120,152,.28)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.65),0 2px 8px rgba(107,45,69,.08)' }}>
               <div className="h-1.5 w-1.5 rounded-full" style={{ background: 'linear-gradient(135deg,#c9a575,#c07898)', boxShadow: '0 0 5px rgba(201,165,117,.55)' }} />
-              <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8b3f5a]">
-                {isReg ? 'Criar Conta Admin' : 'Acesso Administrativo'}
-              </span>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8b3f5a]">Acesso Administrativo</span>
             </div>
-            <h1 className="font-display text-[2.6rem] font-light leading-tight text-[#4a2435]">
-              {isReg ? 'Criar conta\nadmin.' : 'Bem-vindo\nde volta.'}
-            </h1>
-            <p className="mt-2 text-sm text-[#9a7282]">
-              {isReg
-                ? 'Crie sua conta para acessar o painel de gestão.'
-                : 'Entre para acessar o painel de gestão de leads.'}
-            </p>
+            <h1 className="font-display text-[2.6rem] font-light leading-tight text-[#4a2435]">Bem-vindo<br />de volta.</h1>
+            <p className="mt-2 text-sm text-[#9a7282]">Entre para acessar o painel de gestão de leads.</p>
           </div>
 
           <div className="fu1 glass rounded-3xl p-8"
             style={{ boxShadow: '0 8px 48px rgba(107,45,69,.14),0 2px 8px rgba(74,36,53,.06),inset 0 1px 0 rgba(255,255,255,.95)' }}>
             <form onSubmit={submit} className="space-y-4">
-              {isReg && <Field id="name" label="Nome completo" type="text" ph="Patrícia Elias" val={name} set={setName} Icon={Ic.User} />}
               <Field id="email" label="E-mail" type="email" ph="admin@exemplo.com" val={email} set={setEmail} Icon={Ic.Mail} />
-              <Field id="pass" label="Senha" type="password" ph={isReg ? 'Mínimo 6 caracteres' : 'Sua senha'} val={pass} set={setPass} Icon={Ic.Lock} />
-              {isReg && (
-                <Field id="conf" label="Confirmar senha" type="password" ph="Repita a senha" val={conf} set={setConf} Icon={Ic.Lock} />
-              )}
+              <Field id="pass" label="Senha" type="password" ph="Sua senha" val={pass} set={setPass} Icon={Ic.Lock} />
 
               {error && (
                 <div className="flex gap-3 rounded-xl border border-red-100 bg-red-50/90 px-4 py-3">
@@ -193,30 +143,14 @@ export default function AdminLoginPage() {
                   <p className="text-sm text-red-700">{error}</p>
                 </div>
               )}
-              {msg && (
-                <div className="flex gap-3 rounded-xl border border-emerald-100 bg-emerald-50/90 px-4 py-3">
-                  <span className="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-bold text-white">✓</span>
-                  <p className="text-sm text-emerald-700">{msg}</p>
-                </div>
-              )}
 
               <button type="submit" disabled={busy}
                 className="btn-brand mt-1 w-full rounded-2xl py-4 text-sm font-semibold tracking-wide disabled:opacity-55">
                 {busy
                   ? <span className="flex items-center justify-center gap-2.5"><span className="h-4 w-4 rounded-full border-2 border-white/25 border-t-white animate-spin" />Processando...</span>
-                  : isReg ? 'Criar conta' : 'Entrar no Painel'}
+                  : 'Entrar no Painel'}
               </button>
             </form>
-
-            <div className="hr-brand my-5" />
-
-            <button type="button" onClick={toggle}
-              className="w-full text-center text-sm text-[#9a7282] hover:text-[#4a2435] transition">
-              {isReg ? 'Já tem conta? ' : 'Primeiro acesso? '}
-              <span className="font-semibold text-[#8b3f5a] underline underline-offset-2">
-                {isReg ? 'Entrar' : 'Criar conta admin'}
-              </span>
-            </button>
           </div>
         </div>
       </div>

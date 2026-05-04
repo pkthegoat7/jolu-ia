@@ -9,8 +9,8 @@ export async function GET(request: Request) {
 
   const [totalLeads, analisadas, emailsEnviados] = await Promise.all([
     prisma.lead.count(),
-    prisma.leadAnalise.count(),
-    prisma.leadAnalise.count({ where: { emailEnviado: true } }),
+    prisma.skinAnalysis.count(),
+    prisma.skinAnalysis.count({ where: { emailEnviado: true } }),
   ]);
 
   return NextResponse.json({

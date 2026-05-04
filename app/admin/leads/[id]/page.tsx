@@ -53,11 +53,9 @@ export default function LeadDetailPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (!token) { router.push('/admin'); return; }
-    fetch(apiUrl(`/admin/leads/${id}`), { headers: { Authorization: `Bearer ${token}` } })
+    fetch(apiUrl(`/admin/leads/${id}`), { credentials: 'include' })
       .then(async r => {
-        if (r.status === 401) { localStorage.removeItem('access_token'); router.push('/admin'); return; }
+        if (r.status === 401) { router.push('/admin'); return; }
         const d = await r.json() as Lead;
         setLead(d);
       })

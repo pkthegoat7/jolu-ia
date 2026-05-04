@@ -1,10 +1,31 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { randomBytes, createHmac } from 'crypto';
 import { Resend } from 'resend';
 import { prisma } from '@/lib/prisma';
 import { analisarImagem, uploadToSupabase, type ResultadoAnalise } from '@/lib/analise';
+import { assertSafeUrl } from '@/lib/ssrf';
 
 export const maxDuration = 60;
+
+const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+
+// Best-effort in-memory rate limiter (resets per cold start in serverless)
+const ipBucket = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT = 5;
+const RATE_WINDOW_MS = 60 * 60 * 1000;
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = ipBucket.get(ip);
+  if (!entry || now > entry.resetAt) {
+    ipBucket.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= RATE_LIMIT) return false;
+  entry.count++;
+  return true;
+}
 
 async function enviarEmailProtocolo(
   email: string,
@@ -78,7 +99,7 @@ async function enviarEmailProtocolo(
     html,
   });
 
-  await prisma.leadAnalise.update({
+  await prisma.skinAnalysis.update({
     where: { id: analiseId },
     data: { emailEnviado: true },
   });
@@ -93,6 +114,13 @@ async function dispararWebhook(
 ) {
   const settings = await prisma.settings.findUnique({ where: { id: 'default' } });
   if (!settings?.webhookUrl) return;
+
+  try {
+    assertSafeUrl(settings.webhookUrl);
+  } catch (e) {
+    console.warn('[Webhook] URL inválida ignorada:', (e as Error).message);
+    return;
+  }
 
   const payload = {
     event: 'lead.analyzed',
@@ -119,8 +147,14 @@ async function dispararWebhook(
     headers['X-Jolu-Signature'] = `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`;
   }
 
-  await fetch(settings.webhookUrl, { method: 'POST', headers, body });
-  console.log(`[Webhook] Disparado para ${settings.webhookUrl}`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+  try {
+    await fetch(settings.webhookUrl, { method: 'POST', headers, body, signal: controller.signal });
+    console.log(`[Webhook] Disparado para ${settings.webhookUrl}`);
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function POST(
@@ -128,6 +162,14 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+    if (!checkRateLimit(ip)) {
+      return NextResponse.json(
+        { message: 'Muitas tentativas. Tente novamente mais tarde.' },
+        { status: 429 },
+      );
+    }
+
     const { id: leadId } = await params;
 
     const lead = await prisma.lead.findUnique({ where: { id: leadId } });
@@ -135,7 +177,7 @@ export async function POST(
       return NextResponse.json({ message: 'Lead não encontrado.' }, { status: 404 });
     }
 
-    const existing = await prisma.leadAnalise.findUnique({ where: { leadId } });
+    const existing = await prisma.skinAnalysis.findUnique({ where: { leadId } });
     if (existing) {
       return NextResponse.json({ success: true });
     }
@@ -148,7 +190,16 @@ export async function POST(
       return NextResponse.json({ message: 'Nenhuma imagem foi enviada.' }, { status: 400 });
     }
 
+    if (!ALLOWED_TYPES.has(file.type)) {
+      return NextResponse.json({ message: 'Tipo de arquivo não permitido. Use JPEG, PNG ou WebP.' }, { status: 415 });
+    }
+
     const buffer = Buffer.from(await file.arrayBuffer());
+
+    if (buffer.length > MAX_BYTES) {
+      return NextResponse.json({ message: 'Arquivo muito grande. Máximo 10 MB.' }, { status: 413 });
+    }
+
     const landmarks = landmarksJson ? JSON.parse(landmarksJson) : null;
 
     const filePath = `leads/${Date.now()}-${randomBytes(4).toString('hex')}.jpg`;
@@ -156,18 +207,24 @@ export async function POST(
 
     const resultado = await analisarImagem(buffer, landmarks);
 
-    const registro = await prisma.leadAnalise.create({
+    const registro = await prisma.skinAnalysis.create({
       data: { leadId, imageUrl: publicUrl, resultado },
     });
 
     const tokenInfo = await prisma.campaignToken.findUnique({ where: { id: lead.tokenId } });
 
-    enviarEmailProtocolo(lead.email, lead.nome, resultado, registro.id).catch((err) =>
-      console.error('[Email] Falha ao enviar protocolo:', err),
+    // Use after() so these run after the response is delivered,
+    // ensuring the Vercel sandbox stays alive long enough to complete them.
+    after(() =>
+      enviarEmailProtocolo(lead.email, lead.nome, resultado, registro.id).catch((err) =>
+        console.error('[Email] Falha ao enviar protocolo:', err),
+      ),
     );
 
-    dispararWebhook(lead, tokenInfo?.campanha ?? '', resultado).catch((err) =>
-      console.error('[Webhook] Falha ao disparar:', err),
+    after(() =>
+      dispararWebhook(lead, tokenInfo?.campanha ?? '', resultado).catch((err) =>
+        console.error('[Webhook] Falha ao disparar:', err),
+      ),
     );
 
     return NextResponse.json({ success: true });

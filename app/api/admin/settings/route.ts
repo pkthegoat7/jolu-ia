@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/jwt';
 import { prisma } from '@/lib/prisma';
+import { isSafeUrl } from '@/lib/ssrf';
 
 export async function GET(request: Request) {
   if (!getAuthUser(request)) {
@@ -16,12 +17,20 @@ export async function PUT(request: Request) {
     return NextResponse.json({ message: 'Não autorizado.' }, { status: 401 });
   }
 
-  const body = await request.json() as { webhookUrl?: string };
+  const body = await request.json() as { webhookUrl?: string | null };
+  const url = body.webhookUrl?.trim() || null;
+
+  if (url) {
+    const check = isSafeUrl(url);
+    if (!check.ok) {
+      return NextResponse.json({ message: check.reason }, { status: 400 });
+    }
+  }
 
   const settings = await prisma.settings.upsert({
     where: { id: 'default' },
-    update: { webhookUrl: body.webhookUrl ?? null },
-    create: { id: 'default', webhookUrl: body.webhookUrl ?? null },
+    update: { webhookUrl: url },
+    create: { id: 'default', webhookUrl: url },
   });
 
   return NextResponse.json({ webhookUrl: settings.webhookUrl ?? '' });

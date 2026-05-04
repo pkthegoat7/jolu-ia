@@ -11,17 +11,20 @@ model User {
   email         String     @unique
   passwordHash  String
   name          String
+  role          UserRole   @default(ADMIN)
   birthDate     DateTime?
   skinType      SkinType?
   fitzpatrick   Int?
   allergies     String[]
 
   clinicId      String?
-  clinic        Clinic?    @relation(fields: [clinicId], references: [id])
+  clinic        Clinic?    @relation(fields: [clinicId], references: [id], onDelete: SetNull)
 
   analyses      Analysis[]
   analises      Analise[]
   createdAt     DateTime   @default(now())
+
+  @@index([clinicId])
 }
 
 model Clinic {
@@ -32,10 +35,11 @@ model Clinic {
   createdAt DateTime  @default(now())
 }
 
+// Legacy model — kept for existing data. New analyses go through SkinAnalysis.
 model Analysis {
   id           String   @id @default(uuid())
   userId       String
-  user         User     @relation(fields: [userId], references: [id])
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   area         Area
   imageUrl     String
   scores       Json
@@ -43,8 +47,12 @@ model Analysis {
   modelVersion String
   processingMs Int
   createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
 }
 
+// Used by /api/analise/upload (authenticated users). Future: merge into SkinAnalysis.
 model Analise {
   id        String   @id @default(uuid())
   userId    String
@@ -52,9 +60,13 @@ model Analise {
   resultado Json
   createdAt DateTime @default(now())
 
-  usuario   User     @relation(fields: [userId], references: [id])
+  usuario   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
 }
 
+// Legacy model — not used in active code paths.
 model Product {
   id                String   @id @default(uuid())
   name              String
@@ -66,7 +78,9 @@ model Product {
   contraindications String[]
 
   clinicId          String
-  clinic            Clinic   @relation(fields: [clinicId], references: [id])
+  clinic            Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@index([clinicId])
 }
 
 model CampaignToken {
@@ -76,6 +90,8 @@ model CampaignToken {
   ativo     Boolean  @default(true)
   leads     Lead[]
   createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 model Lead {
@@ -85,9 +101,12 @@ model Lead {
   telefone       String
   desejaMelhorar String
   tokenId        String
-  token          CampaignToken @relation(fields: [tokenId], references: [id])
-  analise        LeadAnalise?
+  token          CampaignToken @relation(fields: [tokenId], references: [id], onDelete: Restrict)
+  analise        SkinAnalysis?
   createdAt      DateTime      @default(now())
+
+  @@index([tokenId])
+  @@index([createdAt])
 }
 
 model Settings {
@@ -96,14 +115,23 @@ model Settings {
   updatedAt  DateTime @updatedAt
 }
 
-model LeadAnalise {
+model SkinAnalysis {
   id           String   @id @default(uuid())
   leadId       String   @unique
-  lead         Lead     @relation(fields: [leadId], references: [id])
+  lead         Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
   imageUrl     String
   resultado    Json
   emailEnviado Boolean  @default(false)
   createdAt    DateTime @default(now())
+
+  @@index([leadId])
+  @@index([emailEnviado])
+  @@index([createdAt])
+}
+
+enum UserRole {
+  ADMIN
+  VIEWER
 }
 
 enum SkinType {

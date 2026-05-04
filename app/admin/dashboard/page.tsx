@@ -40,13 +40,12 @@ export default function AdminDashboard() {
   const [webhookBusy, setWebhookBusy] = useState(false);
   const [webhookMsg, setWebhookMsg] = useState('');
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-
+  // Cookie is HttpOnly — sent automatically on same-origin requests.
   const authFetch = useCallback(async (url: string, opts?: RequestInit) => {
-    const res = await fetch(url, { ...opts, headers: { ...opts?.headers, Authorization: `Bearer ${token}` } });
-    if (res.status === 401) { localStorage.removeItem('access_token'); router.push('/admin'); }
+    const res = await fetch(url, { ...opts, credentials: 'include' });
+    if (res.status === 401) { router.push('/admin'); }
     return res;
-  }, [token, router]);
+  }, [router]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -91,7 +90,10 @@ export default function AdminDashboard() {
 
   useEffect(() => { load(); }, [load]);
 
-  const logout = () => { localStorage.removeItem('access_token'); router.push('/admin'); };
+  const logout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    router.push('/admin');
+  };
 
   const createToken = async (e: React.FormEvent) => {
     e.preventDefault();

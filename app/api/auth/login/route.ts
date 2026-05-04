@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcrypt';
 import { prisma } from '@/lib/prisma';
-import { signJwt } from '@/lib/jwt';
+import { signJwt, COOKIE_NAME, cookieOptions } from '@/lib/jwt';
 
 export async function POST(request: Request) {
   try {
@@ -25,12 +25,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Email ou senha inválidos' }, { status: 401 });
     }
 
-    const access_token = signJwt({ sub: user.id, email: user.email, name: user.name });
+    const token = signJwt({ sub: user.id, email: user.email, name: user.name });
 
-    return NextResponse.json({
-      access_token,
+    const response = NextResponse.json({
       user: { id: user.id, email: user.email, name: user.name },
     });
+    response.cookies.set(COOKIE_NAME, token, cookieOptions());
+    return response;
   } catch (err) {
     console.error('[auth/login]', err);
     return NextResponse.json({ message: 'Erro interno.' }, { status: 500 });

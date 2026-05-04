@@ -3,6 +3,10 @@ import bcrypt from 'bcrypt';
 import { prisma } from '@/lib/prisma';
 
 export async function POST(request: Request) {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_REGISTRATION !== 'true') {
+    return NextResponse.json({ message: 'Registro desabilitado.' }, { status: 403 });
+  }
+
   try {
     const body = await request.json() as { email?: string; password?: string; name?: string };
     const { email, password, name } = body;
