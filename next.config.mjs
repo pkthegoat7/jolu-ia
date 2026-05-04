@@ -3,7 +3,7 @@ import withPWAInit from "@ducanh2912/next-pwa";
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // 1. Configurações de Acesso e Rede Local
-  allowedDevOrigins: ['192.168.0.10'],
+  allowedDevOrigins: ['192.168.0.10', '192.168.0.246'],
   
   // 2. Monitoramento e Logs
   logging: {

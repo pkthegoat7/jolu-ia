@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String     @id @default(uuid())
+  email         String     @unique
+  passwordHash  String
+  name          String
+  birthDate     DateTime?
+  skinType      SkinType?
+  fitzpatrick   Int?
+  allergies     String[]
+
+  clinicId      String?
+  clinic        Clinic?    @relation(fields: [clinicId], references: [id])
+
+  analyses      Analysis[]
+  analises      Analise[]
+  createdAt     DateTime   @default(now())
+}
+
+model Clinic {
+  id        String    @id @default(uuid())
+  name      String
+  users     User[]
+  products  Product[]
+  createdAt DateTime  @default(now())
+}
+
+model Analysis {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  area         Area
+  imageUrl     String
+  scores       Json
+  confidence   Float
+  modelVersion String
+  processingMs Int
+  createdAt    DateTime @default(now())
+}
+
+model Analise {
+  id        String   @id @default(uuid())
+  userId    String
+  imageUrl  String
+  resultado Json
+  createdAt DateTime @default(now())
+
+  usuario   User     @relation(fields: [userId], references: [id])
+}
+
+model Product {
+  id                String   @id @default(uuid())
+  name              String
+  description       String
+  imageUrl          String?
+  price             Decimal
+  category          Category
+  targetScores      Json
+  contraindications String[]
+
+  clinicId          String
+  clinic            Clinic   @relation(fields: [clinicId], references: [id])
+}
+
+model CampaignToken {
+  id        String   @id @default(uuid())
+  slug      String   @unique
+  campanha  String
+  ativo     Boolean  @default(true)
+  leads     Lead[]
+  createdAt DateTime @default(now())
+}
+
+model Lead {
+  id             String        @id @default(uuid())
+  nome           String
+  email          String
+  telefone       String
+  desejaMelhorar String
+  tokenId        String
+  token          CampaignToken @relation(fields: [tokenId], references: [id])
+  analise        LeadAnalise?
+  createdAt      DateTime      @default(now())
+}
+
+model LeadAnalise {
+  id           String   @id @default(uuid())
+  leadId       String   @unique
+  lead         Lead     @relation(fields: [leadId], references: [id])
+  imageUrl     String
+  resultado    Json
+  emailEnviado Boolean  @default(false)
+  createdAt    DateTime @default(now())
+}
+
+enum SkinType {
+  OILY
+  DRY
+  COMBINATION
+  NORMAL
+}
+
+enum Area {
+  FACE
+  NECK
+  CHEST
+  HANDS
+}
+
+enum Category {
+  CLEANSER
+  TONER
+  SERUM
+  MOISTURIZER
+  SUNSCREEN
+  TREATMENT
+}
