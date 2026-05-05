@@ -1,6 +1,6 @@
 import { NextResponse, after } from 'next/server';
 import { randomBytes, createHmac } from 'crypto';
-import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 import { prisma } from '@/lib/prisma';
 import { analisarImagem, uploadToSupabase, type ResultadoAnalise } from '@/lib/analise';
 import { assertSafeUrl } from '@/lib/ssrf';
@@ -33,13 +33,12 @@ async function enviarEmailProtocolo(
   resultado: ResultadoAnalise,
   analiseId: string,
 ) {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    console.log(`[Email] RESEND_API_KEY não configurada — protocolo para ${email} (${nome})`);
+  const gmailUser = process.env.GMAIL_USER;
+  const gmailPass = process.env.GMAIL_APP_PASSWORD;
+  if (!gmailUser || !gmailPass) {
+    console.log(`[Email] GMAIL_USER/GMAIL_APP_PASSWORD não configurados — protocolo para ${email} (${nome})`);
     return;
   }
-
-  const resend = new Resend(apiKey);
 
   const produtosHtml = resultado.recomendacoes
     .map(
@@ -92,8 +91,13 @@ async function enviarEmailProtocolo(
     </body>
     </html>`;
 
-  await resend.emails.send({
-    from: 'Patrícia Elias Skin <onboarding@resend.dev>',
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user: gmailUser, pass: gmailPass },
+  });
+
+  await transporter.sendMail({
+    from: `Patrícia Elias Skin <${gmailUser}>`,
     to: email,
     subject: `${nome}, seu protocolo personalizado de pele está aqui`,
     html,

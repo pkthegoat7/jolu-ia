@@ -39,6 +39,8 @@ export default function AdminDashboard() {
   const [webhookUrl, setWebhookUrl] = useState('');
   const [webhookBusy, setWebhookBusy] = useState(false);
   const [webhookMsg, setWebhookMsg] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Cookie is HttpOnly — sent automatically on same-origin requests.
   const authFetch = useCallback(async (url: string, opts?: RequestInit) => {
@@ -108,6 +110,18 @@ export default function AdminDashboard() {
       setNewCampanha(''); setNewSlug('');
       await load();
     } finally { setTokenBusy(false); }
+  };
+
+  const deleteLead = async () => {
+    if (!confirmDeleteId) return;
+    setDeleting(true);
+    try {
+      await authFetch(apiUrl(`/admin/leads/${confirmDeleteId}`), { method: 'DELETE' });
+      setConfirmDeleteId(null);
+      await load();
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const toggleToken = async (id: string, ativo: boolean) => {
@@ -195,8 +209,8 @@ export default function AdminDashboard() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-[#e8d0db]/60">
-                        {['Nome', 'Email', 'Telefone', 'Campanha', 'Tipo de Pele', 'Data', 'Status'].map(h => (
-                          <th key={h} className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-[#b8a0ac]">{h}</th>
+                        {['Nome', 'Email', 'Telefone', 'Campanha', 'Tipo de Pele', 'Data', 'Status', ''].map((h, i) => (
+                          <th key={i} className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-[#b8a0ac]">{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -236,6 +250,16 @@ export default function AdminDashboard() {
                                 <span className="h-1.5 w-1.5 rounded-full bg-amber-400" /> Pendente
                               </span>
                             )}
+                          </td>
+                          <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
+                            <button
+                              onClick={() => setConfirmDeleteId(l.id)}
+                              className="flex items-center justify-center h-7 w-7 rounded-lg text-[#c4a0b8] hover:bg-red-50 hover:text-red-500 transition-colors"
+                              title="Apagar lead">
+                              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
+                              </svg>
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -387,6 +411,39 @@ export default function AdminDashboard() {
         )}
 
       </div>
+
+      {/* ── Delete confirmation modal ── */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm px-4">
+          <div className="glass rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
+            <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl"
+              style={{ background: 'rgba(239,68,68,.10)', border: '1px solid rgba(239,68,68,.20)' }}>
+              <svg className="h-7 w-7 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
+              </svg>
+            </div>
+            <h2 className="font-display text-xl font-light text-[#4a2435] mb-2">Apagar este lead?</h2>
+            <p className="text-sm text-[#9a7282] mb-7 leading-relaxed">
+              Esta ação é irreversível. O lead e sua análise serão removidos permanentemente.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDeleteId(null)}
+                disabled={deleting}
+                className="flex-1 btn-ghost rounded-2xl py-3 text-[13px] font-semibold disabled:opacity-50">
+                Cancelar
+              </button>
+              <button
+                onClick={deleteLead}
+                disabled={deleting}
+                className="flex-1 rounded-2xl py-3 text-[13px] font-semibold text-white transition-all disabled:opacity-50"
+                style={{ background: 'linear-gradient(135deg,#dc2626,#ef4444)' }}>
+                {deleting ? 'Apagando...' : 'Apagar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
