@@ -41,6 +41,8 @@ export default function AdminDashboard() {
   const [webhookMsg, setWebhookMsg] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [confirmDeleteTokenId, setConfirmDeleteTokenId] = useState<string | null>(null);
+  const [deletingToken, setDeletingToken] = useState(false);
 
   // Cookie is HttpOnly — sent automatically on same-origin requests.
   const authFetch = useCallback(async (url: string, opts?: RequestInit) => {
@@ -121,6 +123,18 @@ export default function AdminDashboard() {
       await load();
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const deleteToken = async () => {
+    if (!confirmDeleteTokenId) return;
+    setDeletingToken(true);
+    try {
+      await authFetch(apiUrl(`/admin/tokens/${confirmDeleteTokenId}`), { method: 'DELETE' });
+      setConfirmDeleteTokenId(null);
+      await load();
+    } finally {
+      setDeletingToken(false);
     }
   };
 
@@ -337,10 +351,20 @@ export default function AdminDashboard() {
                           Criado em {new Date(t.createdAt).toLocaleDateString('pt-BR')}
                         </p>
                       </div>
-                      <button onClick={() => toggleToken(t.id, t.ativo)}
-                        className={`rounded-xl px-4 py-2 text-[13px] font-semibold whitespace-nowrap transition-all ${t.ativo ? 'btn-ghost' : 'btn-brand'}`}>
-                        {t.ativo ? 'Desativar' : 'Ativar'}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => toggleToken(t.id, t.ativo)}
+                          className={`rounded-xl px-4 py-2 text-[13px] font-semibold whitespace-nowrap transition-all ${t.ativo ? 'btn-ghost' : 'btn-brand'}`}>
+                          {t.ativo ? 'Desativar' : 'Ativar'}
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteTokenId(t.id)}
+                          className="flex items-center justify-center h-9 w-9 rounded-xl text-[#c4a0b8] hover:bg-red-50 hover:text-red-500 transition-colors"
+                          title="Apagar campanha">
+                          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -411,6 +435,48 @@ export default function AdminDashboard() {
         )}
 
       </div>
+
+      {/* ── Delete token confirmation modal ── */}
+      {confirmDeleteTokenId && (() => {
+        const t = tokens.find(tk => tk.id === confirmDeleteTokenId);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm px-4">
+            <div className="glass rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
+              <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl"
+                style={{ background: 'rgba(239,68,68,.10)', border: '1px solid rgba(239,68,68,.20)' }}>
+                <svg className="h-7 w-7 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
+                </svg>
+              </div>
+              <h2 className="font-display text-xl font-light text-[#4a2435] mb-2">Apagar campanha?</h2>
+              <p className="text-sm text-[#9a7282] mb-2 leading-relaxed">
+                <strong className="text-[#4a2435]">{t?.campanha}</strong>
+              </p>
+              {t && t._count.leads > 0 && (
+                <p className="text-sm text-red-500 mb-4 leading-relaxed">
+                  Atenção: {t._count.leads} lead{t._count.leads > 1 ? 's' : ''} vinculado{t._count.leads > 1 ? 's' : ''} também {t._count.leads > 1 ? 'serão apagados' : 'será apagado'}.
+                </p>
+              )}
+              <p className="text-sm text-[#9a7282] mb-7 leading-relaxed">Esta ação é irreversível.</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirmDeleteTokenId(null)}
+                  disabled={deletingToken}
+                  className="flex-1 btn-ghost rounded-2xl py-3 text-[13px] font-semibold disabled:opacity-50">
+                  Cancelar
+                </button>
+                <button
+                  onClick={deleteToken}
+                  disabled={deletingToken}
+                  className="flex-1 rounded-2xl py-3 text-[13px] font-semibold text-white transition-all disabled:opacity-50"
+                  style={{ background: 'linear-gradient(135deg,#dc2626,#ef4444)' }}>
+                  {deletingToken ? 'Apagando...' : 'Apagar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Delete confirmation modal ── */}
       {confirmDeleteId && (
