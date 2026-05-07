@@ -287,9 +287,10 @@ export default function AdminDashboard() {
             {total > 30 && (
               <div className="flex items-center justify-between text-sm">
                 <p className="text-[#9a7282]">{total} leads no total</p>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
                   <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
                     className="btn-ghost rounded-xl px-4 py-2 text-[13px] font-semibold disabled:opacity-40">Anterior</button>
+                  <span className="text-[13px] text-[#9a7282]">Página {page} de {Math.ceil(total / 30)}</span>
                   <button disabled={page * 30 >= total} onClick={() => setPage(p => p + 1)}
                     className="btn-ghost rounded-xl px-4 py-2 text-[13px] font-semibold disabled:opacity-40">Próximo</button>
                 </div>

@@ -13,6 +13,7 @@ export type ResultadoAnalise = {
   nivelSensibilidade: string;
   observacoes: string;
   recomendacoes: { nome: string; motivo: string; modoDeUso: string }[];
+  modoFallback?: boolean;
 };
 
 const FACE_OVAL_INDICES = [
@@ -227,8 +228,9 @@ function fallbackPorBuffer(imageBuffer: Buffer): ResultadoAnalise {
     nivelOleosidade: bucket === 0 ? 'Alta' : bucket === 1 ? 'Media' : 'Baixa',
     nivelAcne: bucket === 0 ? 'Moderada' : 'Leve',
     nivelSensibilidade: bucket === 2 ? 'Alta' : 'Baixa',
-    observacoes: 'Análise realizada sem dados de IA (fallback).',
+    observacoes: 'Análise estimada — serviço de IA indisponível no momento.',
     recomendacoes: recomendacoesPara(tipoPele),
+    modoFallback: true,
   };
 }
 

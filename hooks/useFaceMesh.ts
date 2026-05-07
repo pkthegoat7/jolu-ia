@@ -1,22 +1,21 @@
 "use client";
 import { useEffect, useRef, useCallback } from "react";
+import type { FaceLandmarker, DrawingUtils } from "@mediapipe/tasks-vision";
 
 const WASM_CDN =
   "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm";
 const MODEL_URL =
   "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
 
-type AnyRef = React.RefObject<any>;
-
 export function useFaceMesh(
-  videoRef: AnyRef,
-  canvasRef: AnyRef,
+  videoRef: React.RefObject<HTMLVideoElement | null>,
+  canvasRef: React.RefObject<HTMLCanvasElement | null>,
   onFaceDetected?: (detected: boolean) => void
 ) {
-  const landmarkerRef = useRef<any>(null);
-  const FLClassRef = useRef<any>(null);
-  const DUClassRef = useRef<any>(null);
-  const drawingRef = useRef<any>(null);
+  const landmarkerRef = useRef<FaceLandmarker | null>(null);
+  const FLClassRef = useRef<typeof FaceLandmarker | null>(null);
+  const DUClassRef = useRef<typeof DrawingUtils | null>(null);
+  const drawingRef = useRef<DrawingUtils | null>(null);
   const animRef = useRef<number>(0);
   const runningRef = useRef(false);
   const onFaceRef = useRef(onFaceDetected);
@@ -26,8 +25,8 @@ export function useFaceMesh(
   const loop = useCallback(() => {
     if (!runningRef.current) return;
 
-    const video = videoRef.current as HTMLVideoElement | null;
-    const canvas = canvasRef.current as HTMLCanvasElement | null;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
     const landmarker = landmarkerRef.current;
 
     if (!video || !canvas || !landmarker || video.readyState < 2) {
@@ -140,7 +139,7 @@ export function useFaceMesh(
   const stop = useCallback(() => {
     runningRef.current = false;
     cancelAnimationFrame(animRef.current);
-    const canvas = canvasRef.current as HTMLCanvasElement | null;
+    const canvas = canvasRef.current;
     if (canvas) {
       canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
     }

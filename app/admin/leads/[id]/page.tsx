@@ -8,6 +8,7 @@ type Produto  = { nome: string; motivo: string; modoDeUso: string };
 type Resultado = {
   tipoPele: string; nivelOleosidade: string; nivelAcne: string;
   nivelSensibilidade: string; observacoes?: string; recomendacoes: Produto[];
+  modoFallback?: boolean;
 };
 type Lead = {
   id: string; nome: string; email: string; telefone: string;
@@ -152,7 +153,12 @@ export default function LeadDetailPage() {
                 <div className="text-center sm:text-left">
                   <p className="text-[10px] uppercase tracking-[0.3em] text-white/40">Tipo de Pele</p>
                   <h2 className="font-display text-4xl font-light text-white leading-none mt-1">{ia?.tipoPele}</h2>
-                  {ia?.observacoes && !ia.observacoes.includes('fallback') && (
+                  {ia?.modoFallback && (
+                    <p className="mt-2 rounded-lg px-3 py-1.5 text-[11px] font-medium bg-amber-500/20 text-amber-300 inline-block">
+                      ⚠ Análise estimada — IA indisponível no momento da captura
+                    </p>
+                  )}
+                  {ia?.observacoes && !ia.modoFallback && (
                     <p className="mt-2 text-[13px] italic text-white/55 leading-relaxed max-w-sm"
                       style={{ borderLeft: '2px solid rgba(192,120,152,.4)', paddingLeft: '12px' }}>
                       "{ia.observacoes}"

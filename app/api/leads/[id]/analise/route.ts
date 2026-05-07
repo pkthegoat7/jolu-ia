@@ -1,9 +1,32 @@
 import { NextResponse, after } from 'next/server';
-import { randomBytes, createHmac } from 'crypto';
+import { randomBytes, createHmac, timingSafeEqual } from 'crypto';
+import { promises as dns } from 'dns';
+import { isIP } from 'net';
 import nodemailer from 'nodemailer';
 import { prisma } from '@/lib/prisma';
 import { analisarImagem, uploadToSupabase, type ResultadoAnalise } from '@/lib/analise';
-import { assertSafeUrl } from '@/lib/ssrf';
+import { assertSafeUrl, isPrivateIp } from '@/lib/ssrf';
+
+function makeAnalysisToken(leadId: string): string {
+  const secret = process.env.JWT_SECRET ?? 'fallback_dev_secret';
+  return createHmac('sha256', secret).update(leadId).digest('hex');
+}
+
+function validateAnalysisToken(leadId: string, provided: string): boolean {
+  const expected = makeAnalysisToken(leadId);
+  if (provided.length !== expected.length) return false;
+  return timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
+}
+
+const MAGIC_JPEG = [0xff, 0xd8, 0xff];
+const MAGIC_PNG  = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+function validateMagicBytes(buf: Buffer, type: string): boolean {
+  if (type === 'image/jpeg') return MAGIC_JPEG.every((b, i) => buf[i] === b);
+  if (type === 'image/png')  return MAGIC_PNG.every((b, i) => buf[i] === b);
+  if (type === 'image/webp') return buf.slice(0, 4).toString('ascii') === 'RIFF' && buf.slice(8, 12).toString('ascii') === 'WEBP';
+  return false;
+}
 
 export const maxDuration = 60;
 
@@ -74,7 +97,7 @@ async function enviarEmailProtocolo(
               <tr><td style="padding:6px 0;font-size:13px;color:#9a7282;">Acne</td><td style="padding:6px 0;font-size:13px;font-weight:600;color:#4a2435;">${resultado.nivelAcne}</td></tr>
               <tr><td style="padding:6px 0;font-size:13px;color:#9a7282;">Sensibilidade</td><td style="padding:6px 0;font-size:13px;font-weight:600;color:#4a2435;">${resultado.nivelSensibilidade}</td></tr>
             </table>
-            ${resultado.observacoes && !resultado.observacoes.includes('fallback')
+            ${resultado.observacoes && !resultado.modoFallback
               ? `<p style="margin:12px 0 0;font-size:13px;font-style:italic;color:#9a7282;border-left:2px solid #c07898;padding-left:12px;">"${resultado.observacoes}"</p>`
               : ''}
           </div>
@@ -126,6 +149,21 @@ async function dispararWebhook(
     return;
   }
 
+  // DNS rebinding check: resolve the hostname right before fetching
+  try {
+    const hostname = new URL(settings.webhookUrl).hostname;
+    if (!isIP(hostname)) {
+      const { address } = await dns.lookup(hostname, { family: 4 });
+      if (isPrivateIp(address)) {
+        console.warn('[Webhook] Domínio resolveu para IP privado:', address);
+        return;
+      }
+    }
+  } catch {
+    console.warn('[Webhook] Falha ao resolver DNS — webhook bloqueado.');
+    return;
+  }
+
   const payload = {
     event: 'lead.analyzed',
     timestamp: new Date().toISOString(),
@@ -166,15 +204,15 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
-    if (!checkRateLimit(ip)) {
+    const { id: leadId } = await params;
+
+    // Rate limit by leadId (resource-scoped, not IP-spoofable)
+    if (!checkRateLimit(leadId)) {
       return NextResponse.json(
         { message: 'Muitas tentativas. Tente novamente mais tarde.' },
         { status: 429 },
       );
     }
-
-    const { id: leadId } = await params;
 
     const lead = await prisma.lead.findUnique({ where: { id: leadId } });
     if (!lead) {
@@ -189,6 +227,12 @@ export async function POST(
     const formData = await request.formData();
     const file = formData.get('image') as File | null;
     const landmarksJson = formData.get('landmarks') as string | null;
+    const providedToken = (formData.get('analysisToken') as string | null) ?? '';
+
+    // Verify HMAC token to prevent IDOR (unauthorized submission for any leadId)
+    if (!validateAnalysisToken(leadId, providedToken)) {
+      return NextResponse.json({ message: 'Token de análise inválido.' }, { status: 403 });
+    }
 
     if (!file) {
       return NextResponse.json({ message: 'Nenhuma imagem foi enviada.' }, { status: 400 });
@@ -204,7 +248,19 @@ export async function POST(
       return NextResponse.json({ message: 'Arquivo muito grande. Máximo 10 MB.' }, { status: 413 });
     }
 
-    const landmarks = landmarksJson ? JSON.parse(landmarksJson) : null;
+    // Validate magic bytes — file.type is client-controlled and can be spoofed
+    if (!validateMagicBytes(buffer, file.type)) {
+      return NextResponse.json({ message: 'Conteúdo do arquivo não corresponde ao tipo declarado.' }, { status: 415 });
+    }
+
+    let landmarks: unknown = null;
+    if (landmarksJson) {
+      try {
+        landmarks = JSON.parse(landmarksJson);
+      } catch {
+        return NextResponse.json({ message: 'Formato de landmarks inválido.' }, { status: 400 });
+      }
+    }
 
     const filePath = `leads/${Date.now()}-${randomBytes(4).toString('hex')}.jpg`;
     const publicUrl = await uploadToSupabase(buffer, filePath, 'image/jpeg');
