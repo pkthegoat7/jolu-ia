@@ -31,6 +31,14 @@ export async function POST(request: Request) {
 
     const finalSlug = slug?.trim() || randomBytes(6).toString('hex');
 
+    const slugRegex = /^[a-z0-9_-]+$/i;
+    if (!slugRegex.test(finalSlug)) {
+      return NextResponse.json(
+        { message: 'Slug inválido. Use apenas letras, números, hífens e underscores.' },
+        { status: 400 },
+      );
+    }
+
     const token = await prisma.campaignToken.create({
       data: { campanha, slug: finalSlug },
     });
