@@ -57,6 +57,7 @@ function AnalisePage() {
   const [step, setStep] = useState<'validating' | 'invalid' | 'form' | 'scan' | 'processing'>('validating');
   const [campanha, setCampanha] = useState('');
   const [leadId, setLeadId] = useState('');
+  const [analysisToken, setAnalysisToken] = useState('');
   const [error, setError] = useState('');
 
   // Form fields
@@ -104,9 +105,10 @@ function AnalisePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nome, email, telefone, desejaMelhorar: desejos, tokenSlug }),
       });
-      const data = await res.json() as { id?: string; message?: string };
+      const data = await res.json() as { id?: string; nome?: string; analysisToken?: string; message?: string };
       if (!res.ok) { setError(data.message ?? 'Erro ao registrar.'); return; }
       setLeadId(data.id!);
+      setAnalysisToken(data.analysisToken ?? '');
       setStep('scan');
     } catch {
       setError('Erro ao conectar. Tente novamente.');
@@ -149,6 +151,7 @@ function AnalisePage() {
       if (!blob) { setStep('scan'); return; }
       const fd = new FormData();
       fd.append('image', blob, 'scan.jpg');
+      fd.append('analysisToken', analysisToken);
       const lm = getLandmarks();
       if (lm) fd.append('landmarks', JSON.stringify(lm));
       try {

@@ -253,10 +253,11 @@ export async function POST(
       return NextResponse.json({ message: 'Conteúdo do arquivo não corresponde ao tipo declarado.' }, { status: 415 });
     }
 
-    let landmarks: unknown = null;
+    type Landmark = { x: number; y: number; z: number };
+    let landmarks: Landmark[] | null = null;
     if (landmarksJson) {
       try {
-        landmarks = JSON.parse(landmarksJson);
+        landmarks = JSON.parse(landmarksJson) as Landmark[] | null;
       } catch {
         return NextResponse.json({ message: 'Formato de landmarks inválido.' }, { status: 400 });
       }
