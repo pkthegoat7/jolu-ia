@@ -1,5 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import sharp from 'sharp';
 import { createClient } from '@supabase/supabase-js';
 
@@ -78,85 +77,25 @@ function parseAnalysisJson(text: string): Record<string, string> | null {
   }
 }
 
-// GPT-4o Vision — primary analyzer
-async function analisarComOpenAI(base64Image: string): Promise<Record<string, string> | null> {
-  const apiKey = process.env.OPENAI_API_KEY;
+async function analisarComGemini(base64Image: string): Promise<Record<string, string> | null> {
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return null;
 
   try {
-    const openai = new OpenAI({ apiKey });
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      max_tokens: 512,
-      messages: [
-        {
-          role: 'system',
-          content: SKIN_ANALYSIS_SYSTEM,
-        },
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image_url',
-              image_url: { url: `data:image/jpeg;base64,${base64Image}`, detail: 'low' },
-            },
-            {
-              type: 'text',
-              text: 'Analise esta imagem facial e retorne o JSON de diagnóstico de pele.',
-            },
-          ],
-        },
-      ],
-    });
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-    const text = response.choices[0]?.message?.content ?? '';
+    const result = await model.generateContent([
+      { text: SKIN_ANALYSIS_SYSTEM + '\n\nAnalise esta imagem facial e retorne o JSON de diagnóstico de pele.' },
+      { inlineData: { mimeType: 'image/jpeg', data: base64Image } },
+    ]);
+
+    const text = result.response.text();
     const parsed = parseAnalysisJson(text);
-    if (parsed) console.log('[OpenAI] análise concluída');
+    if (parsed) console.log('[Gemini] análise concluída');
     return parsed;
   } catch (err) {
-    console.error('[OpenAI] erro na análise:', err instanceof Error ? err.message : err);
-    return null;
-  }
-}
-
-// Claude Haiku — fallback analyzer
-async function analisarComClaude(base64Image: string): Promise<Record<string, string> | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-
-  try {
-    const claude = new Anthropic({ apiKey });
-    const response = await claude.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 512,
-      system: SKIN_ANALYSIS_SYSTEM,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: { type: 'base64', media_type: 'image/jpeg', data: base64Image },
-            },
-            {
-              type: 'text',
-              text: 'Analise esta imagem facial e retorne o JSON de diagnóstico de pele.',
-            },
-          ],
-        },
-      ],
-    });
-
-    const text = response.content
-      .filter((b) => b.type === 'text')
-      .map((b) => (b as { type: 'text'; text: string }).text)
-      .join('');
-
-    const parsed = parseAnalysisJson(text);
-    if (parsed) console.log('[Claude] análise concluída (fallback)');
-    return parsed;
-  } catch (err) {
-    console.error('[Claude] erro na análise:', err instanceof Error ? err.message : err);
+    console.error('[Gemini] erro na análise:', err instanceof Error ? err.message : err);
     return null;
   }
 }
@@ -234,7 +173,6 @@ function fallbackPorBuffer(imageBuffer: Buffer): ResultadoAnalise {
   };
 }
 
-// GPT-4o → Claude → fallback determinístico
 export async function analisarImagem(
   imageBuffer: Buffer,
   landmarks: Landmark[] | null,
@@ -246,9 +184,7 @@ export async function analisarImagem(
 
   const base64Image = faceBuffer.toString('base64');
 
-  const parsed =
-    (await analisarComOpenAI(base64Image)) ??
-    (await analisarComClaude(base64Image));
+  const parsed = await analisarComGemini(base64Image);
 
   if (!parsed) return fallbackPorBuffer(imageBuffer);
 
@@ -264,19 +200,6 @@ export async function analisarImagem(
   };
 }
 
-// text-embedding-3-small — para catálogo por pgvector (SaaS)
-export async function embedText(text: string): Promise<number[]> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error('OPENAI_API_KEY não configurada');
-
-  const openai = new OpenAI({ apiKey });
-  const response = await openai.embeddings.create({
-    model: 'text-embedding-3-small',
-    input: text,
-  });
-
-  return response.data[0].embedding;
-}
 
 export async function uploadToSupabase(
   buffer: Buffer,
