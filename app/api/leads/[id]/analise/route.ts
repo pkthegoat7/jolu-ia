@@ -6,6 +6,7 @@ import nodemailer from 'nodemailer';
 import { prisma } from '@/lib/prisma';
 import { analisarImagem, uploadToSupabase, type ResultadoAnalise } from '@/lib/analise';
 import { assertSafeUrl, isPrivateIp } from '@/lib/ssrf';
+import { syncLeadToWooCommerce } from '@/lib/woocommerce';
 
 function makeAnalysisToken(leadId: string): string {
   const secret = process.env.ANALYSIS_TOKEN_SECRET ?? process.env.JWT_SECRET ?? 'fallback_dev_secret';
@@ -294,6 +295,12 @@ export async function POST(
     after(() =>
       dispararWebhook(lead, tokenInfo?.campanha ?? '', resultado).catch((err) =>
         console.error('[Webhook] Falha ao disparar:', err),
+      ),
+    );
+
+    after(() =>
+      syncLeadToWooCommerce(lead.nome, lead.email, lead.telefone, resultado).catch((err) =>
+        console.error('[WC] Falha ao sincronizar cliente:', err),
       ),
     );
 
