@@ -9,7 +9,9 @@ export default function Home() {
   useEffect(() => {
     // Check if there's a token in the URL (backwards-compat redirect)
     const params = new URLSearchParams(window.location.search);
-    const t = params.get('t');
+    const rawT = params.get('t');
+    // Only allow safe slug characters to prevent injection via the redirect param
+    const t = rawT && /^[a-zA-Z0-9_-]{1,128}$/.test(rawT) ? rawT : null;
     if (t) {
       router.replace(`/analise?t=${t}`);
     } else {

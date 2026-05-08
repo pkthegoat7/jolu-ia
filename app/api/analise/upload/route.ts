@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
-
-export const maxDuration = 60;
 import { getAuthUser } from '@/lib/jwt';
 import { analisarImagem, uploadToSupabase } from '@/lib/analise';
 import { prisma } from '@/lib/prisma';
+
+export const maxDuration = 60;
 
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -42,8 +42,12 @@ export async function POST(request: Request) {
 
     const resultado = await analisarImagem(buffer, landmarks);
 
+    const userId = typeof user.sub === 'string' ? user.sub : null;
+    if (!userId) {
+      return NextResponse.json({ message: 'Token inválido.' }, { status: 401 });
+    }
     const analise = await prisma.analise.create({
-      data: { userId: user.sub as string, imageUrl: publicUrl, resultado },
+      data: { userId, imageUrl: publicUrl, resultado },
       include: { usuario: { select: { name: true } } },
     });
 

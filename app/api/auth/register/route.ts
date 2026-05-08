@@ -3,7 +3,8 @@ import bcrypt from 'bcrypt';
 import { prisma } from '@/lib/prisma';
 
 export async function POST(request: Request) {
-  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_REGISTRATION !== 'true') {
+  // Block registration unless explicitly enabled via env var (applies to all environments)
+  if (process.env.ALLOW_REGISTRATION !== 'true') {
     return NextResponse.json({ message: 'Registro desabilitado.' }, { status: 403 });
   }
 

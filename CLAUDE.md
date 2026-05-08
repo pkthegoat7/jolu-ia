@@ -8,8 +8,8 @@ Next.js 16 app for AI-powered skin analysis. Two distinct user flows: (1) unauth
 - **Language**: TypeScript + React 19
 - **Database**: PostgreSQL via Prisma 7 + `@prisma/adapter-pg`
 - **Auth**: JWT in HttpOnly cookie (`admin_token`, 7d expiry) — `lib/jwt.ts`
-- **AI**: `@anthropic-ai/sdk` + `openai` SDK + `@mediapipe/tasks-vision`
-- **Email**: Resend + Nodemailer
+- **AI**: `@google/generative-ai` (Gemini 1.5 Flash) + `@mediapipe/tasks-vision`
+- **Email**: Nodemailer (Gmail SMTP)
 - **Styling**: Tailwind CSS v4
 - **Mobile**: Capacitor (Android) — `npm run mobile:sync`
 - **PWA**: `@ducanh2912/next-pwa`
@@ -96,8 +96,12 @@ prisma/schema.prisma
 ## Env Vars Required
 
 ```
-DATABASE_URL        # PostgreSQL connection string
-JWT_SECRET          # Required in production
-ANTHROPIC_API_KEY   # Skin analysis AI
-RESEND_API_KEY      # Email sending
+DATABASE_URL              # PostgreSQL connection string
+JWT_SECRET                # Required in production
+ANALYSIS_TOKEN_SECRET     # HMAC secret for analysis tokens (should differ from JWT_SECRET)
+GEMINI_API_KEY            # Google Gemini AI for skin analysis
+SUPABASE_URL              # Supabase project URL
+SUPABASE_KEY              # Supabase service role key (server-only)
+GMAIL_USER                # Gmail address for sending emails
+GMAIL_APP_PASSWORD        # Gmail app password
 ```

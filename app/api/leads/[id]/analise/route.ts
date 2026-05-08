@@ -8,8 +8,17 @@ import { analisarImagem, uploadToSupabase, type ResultadoAnalise } from '@/lib/a
 import { assertSafeUrl, isPrivateIp } from '@/lib/ssrf';
 
 function makeAnalysisToken(leadId: string): string {
-  const secret = process.env.JWT_SECRET ?? 'fallback_dev_secret';
+  const secret = process.env.ANALYSIS_TOKEN_SECRET ?? process.env.JWT_SECRET ?? 'fallback_dev_secret';
   return createHmac('sha256', secret).update(leadId).digest('hex');
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function validateAnalysisToken(leadId: string, provided: string): boolean {
@@ -67,9 +76,9 @@ async function enviarEmailProtocolo(
     .map(
       (p, i) => `
       <div style="margin-bottom:16px;padding:16px;background:#fdf8fb;border-left:3px solid #b96f8d;border-radius:8px;">
-        <p style="margin:0 0 6px;font-weight:700;color:#4a2435;">${i + 1}. ${p.nome}</p>
-        <p style="margin:0 0 4px;color:#7a5060;font-size:14px;">${p.motivo}</p>
-        <p style="margin:0;color:#9a7282;font-size:13px;"><strong>Modo de uso:</strong> ${p.modoDeUso}</p>
+        <p style="margin:0 0 6px;font-weight:700;color:#4a2435;">${i + 1}. ${escapeHtml(p.nome)}</p>
+        <p style="margin:0 0 4px;color:#7a5060;font-size:14px;">${escapeHtml(p.motivo)}</p>
+        <p style="margin:0;color:#9a7282;font-size:13px;"><strong>Modo de uso:</strong> ${escapeHtml(p.modoDeUso)}</p>
       </div>`,
     )
     .join('');
@@ -85,20 +94,20 @@ async function enviarEmailProtocolo(
           <h1 style="margin:0;font-size:26px;font-weight:300;color:#fff;letter-spacing:-0.5px;">Seu Protocolo de Pele</h1>
         </div>
         <div style="padding:32px;">
-          <p style="margin:0 0 20px;font-size:16px;color:#4a2435;">Olá, <strong>${nome}</strong>!</p>
+          <p style="margin:0 0 20px;font-size:16px;color:#4a2435;">Olá, <strong>${escapeHtml(nome)}</strong>!</p>
           <p style="margin:0 0 24px;font-size:14px;color:#7a5060;line-height:1.6;">
             Sua análise facial foi concluída. Abaixo está seu diagnóstico completo e o protocolo de cuidados personalizado para você.
           </p>
           <div style="background:#f7f0f3;border-radius:12px;padding:20px;margin-bottom:24px;">
             <p style="margin:0 0 12px;font-size:10px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:#b8a0ac;">Diagnóstico</p>
             <table style="width:100%;border-collapse:collapse;">
-              <tr><td style="padding:6px 0;font-size:13px;color:#9a7282;width:140px;">Tipo de Pele</td><td style="padding:6px 0;font-size:13px;font-weight:600;color:#4a2435;">${resultado.tipoPele}</td></tr>
-              <tr><td style="padding:6px 0;font-size:13px;color:#9a7282;">Oleosidade</td><td style="padding:6px 0;font-size:13px;font-weight:600;color:#4a2435;">${resultado.nivelOleosidade}</td></tr>
-              <tr><td style="padding:6px 0;font-size:13px;color:#9a7282;">Acne</td><td style="padding:6px 0;font-size:13px;font-weight:600;color:#4a2435;">${resultado.nivelAcne}</td></tr>
-              <tr><td style="padding:6px 0;font-size:13px;color:#9a7282;">Sensibilidade</td><td style="padding:6px 0;font-size:13px;font-weight:600;color:#4a2435;">${resultado.nivelSensibilidade}</td></tr>
+              <tr><td style="padding:6px 0;font-size:13px;color:#9a7282;width:140px;">Tipo de Pele</td><td style="padding:6px 0;font-size:13px;font-weight:600;color:#4a2435;">${escapeHtml(resultado.tipoPele)}</td></tr>
+              <tr><td style="padding:6px 0;font-size:13px;color:#9a7282;">Oleosidade</td><td style="padding:6px 0;font-size:13px;font-weight:600;color:#4a2435;">${escapeHtml(resultado.nivelOleosidade)}</td></tr>
+              <tr><td style="padding:6px 0;font-size:13px;color:#9a7282;">Acne</td><td style="padding:6px 0;font-size:13px;font-weight:600;color:#4a2435;">${escapeHtml(resultado.nivelAcne)}</td></tr>
+              <tr><td style="padding:6px 0;font-size:13px;color:#9a7282;">Sensibilidade</td><td style="padding:6px 0;font-size:13px;font-weight:600;color:#4a2435;">${escapeHtml(resultado.nivelSensibilidade)}</td></tr>
             </table>
             ${resultado.observacoes && !resultado.modoFallback
-              ? `<p style="margin:12px 0 0;font-size:13px;font-style:italic;color:#9a7282;border-left:2px solid #c07898;padding-left:12px;">"${resultado.observacoes}"</p>`
+              ? `<p style="margin:12px 0 0;font-size:13px;font-style:italic;color:#9a7282;border-left:2px solid #c07898;padding-left:12px;">"${escapeHtml(resultado.observacoes)}"</p>`
               : ''}
           </div>
           <p style="margin:0 0 14px;font-size:10px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:#b8a0ac;">Protocolo Recomendado</p>

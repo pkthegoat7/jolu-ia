@@ -8,8 +8,10 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const page = Number(searchParams.get('page') ?? 1);
-  const limit = Number(searchParams.get('limit') ?? 30);
+  const rawPage = parseInt(searchParams.get('page') ?? '1', 10);
+  const rawLimit = parseInt(searchParams.get('limit') ?? '30', 10);
+  const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0 && rawLimit <= 100 ? rawLimit : 30;
   const skip = (page - 1) * limit;
 
   const [data, total] = await Promise.all([
