@@ -86,7 +86,7 @@ async function analisarComGemini(base64Image: string): Promise<Record<string, st
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
 
     const result = await model.generateContent([
       { text: SKIN_ANALYSIS_SYSTEM + '\n\nAnalise esta imagem facial e retorne o JSON de diagnóstico de pele.' },
