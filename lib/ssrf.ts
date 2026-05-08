@@ -5,12 +5,17 @@ const PRIVATE_HOSTNAME = [
   /^10\./,
   /^192\.168\./,
   /^172\.(1[6-9]|2[0-9]|3[01])\./,
-  /^169\.254\./,   // link-local
+  /^169\.254\./,   // link-local / AWS metadata
   /^0\.0\.0\.0$/,
   /^::1$/,
   /^fc00:/i,
   /^fe80:/i,
+  /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./,  // CGNAT RFC 6598
 ];
+
+export function isPrivateIp(ip: string): boolean {
+  return PRIVATE_HOSTNAME.some(p => p.test(ip));
+}
 
 export function assertSafeUrl(rawUrl: string): void {
   let url: URL;
