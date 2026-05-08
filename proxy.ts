@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-async function verifyJwt(token: string, secret: string): Promise<boolean> {
+type JwtClaims = { exp?: number; role?: string };
+
+async function verifyJwt(token: string, secret: string): Promise<JwtClaims | null> {
   try {
     const parts = token.split('.');
-    if (parts.length !== 3) return false;
+    if (parts.length !== 3) return null;
     const [header, payload, sig] = parts;
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
@@ -19,12 +21,12 @@ async function verifyJwt(token: string, secret: string): Promise<boolean> {
       (c) => c.charCodeAt(0),
     );
     const valid = await crypto.subtle.verify('HMAC', key, sigBytes, data);
-    if (!valid) return false;
-    const claims = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
-    if (claims.exp && Date.now() / 1000 > claims.exp) return false;
-    return true;
+    if (!valid) return null;
+    const claims = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))) as JwtClaims;
+    if (claims.exp && Date.now() / 1000 > claims.exp) return null;
+    return claims;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -34,8 +36,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/admin', request.url));
   }
   const secret = process.env.JWT_SECRET ?? 'fallback_dev_secret';
-  const valid = await verifyJwt(token, secret);
-  if (!valid) {
+  const claims = await verifyJwt(token, secret);
+  if (!claims || claims.role !== 'ADMIN') {
     return NextResponse.redirect(new URL('/admin', request.url));
   }
   return NextResponse.next();
