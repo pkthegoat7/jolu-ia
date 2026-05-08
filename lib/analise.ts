@@ -79,7 +79,10 @@ function parseAnalysisJson(text: string): Record<string, string> | null {
 
 async function analisarComGemini(base64Image: string): Promise<Record<string, string> | null> {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey) {
+    console.error('[Gemini] GEMINI_API_KEY não definida');
+    return null;
+  }
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
@@ -91,11 +94,16 @@ async function analisarComGemini(base64Image: string): Promise<Record<string, st
     ]);
 
     const text = result.response.text();
+    console.log('[Gemini] resposta bruta:', text.slice(0, 200));
     const parsed = parseAnalysisJson(text);
-    if (parsed) console.log('[Gemini] análise concluída');
+    if (parsed) {
+      console.log('[Gemini] análise concluída:', JSON.stringify(parsed));
+    } else {
+      console.error('[Gemini] falha ao parsear JSON da resposta');
+    }
     return parsed;
   } catch (err) {
-    console.error('[Gemini] erro na análise:', err instanceof Error ? err.message : err);
+    console.error('[Gemini] erro na análise:', err instanceof Error ? err.message : String(err));
     return null;
   }
 }
