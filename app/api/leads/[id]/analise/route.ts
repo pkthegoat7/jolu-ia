@@ -10,6 +10,9 @@ import { syncLeadToWooCommerce } from '@/lib/woocommerce';
 
 function makeAnalysisToken(leadId: string): string {
   const secret = process.env.ANALYSIS_TOKEN_SECRET ?? process.env.JWT_SECRET ?? 'fallback_dev_secret';
+  if (process.env.NODE_ENV === 'production' && !process.env.ANALYSIS_TOKEN_SECRET && !process.env.JWT_SECRET) {
+    throw new Error('ANALYSIS_TOKEN_SECRET must be set in production');
+  }
   return createHmac('sha256', secret).update(leadId).digest('hex');
 }
 
