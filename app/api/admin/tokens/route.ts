@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { randomBytes } from 'crypto';
-import { getAuthUser } from '@/lib/jwt';
+import { getAuthUser, requireAdmin } from '@/lib/jwt';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(request: Request) {
@@ -17,7 +17,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!getAuthUser(request)) {
+  if (!requireAdmin(request)) {
     return NextResponse.json({ message: 'Não autorizado.' }, { status: 401 });
   }
 
@@ -27,6 +27,9 @@ export async function POST(request: Request) {
 
     if (!campanha) {
       return NextResponse.json({ message: 'Nome da campanha é obrigatório.' }, { status: 400 });
+    }
+    if (campanha.length > 200) {
+      return NextResponse.json({ message: 'Nome da campanha muito longo.' }, { status: 400 });
     }
 
     const finalSlug = slug?.trim() || randomBytes(6).toString('hex');

@@ -52,7 +52,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Email ou senha inválidos' }, { status: 401 });
     }
 
-    const token = signJwt({ sub: user.id, email: user.email, name: user.name });
+    const token = signJwt({ sub: user.id, email: user.email, name: user.name, role: user.role });
 
     const response = NextResponse.json({
       user: { id: user.id, email: user.email, name: user.name },

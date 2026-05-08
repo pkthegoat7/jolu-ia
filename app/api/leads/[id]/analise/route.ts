@@ -4,7 +4,7 @@ import { promises as dns } from 'dns';
 import { isIP } from 'net';
 import nodemailer from 'nodemailer';
 import { prisma } from '@/lib/prisma';
-import { analisarImagem, uploadToSupabase, type ResultadoAnalise } from '@/lib/analise';
+import { analisarImagem, uploadToSupabase, validateMagicBytes, validateLandmarks, type ResultadoAnalise } from '@/lib/analise';
 import { assertSafeUrl, isPrivateIp } from '@/lib/ssrf';
 import { syncLeadToWooCommerce } from '@/lib/woocommerce';
 
@@ -26,16 +26,6 @@ function validateAnalysisToken(leadId: string, provided: string): boolean {
   const expected = makeAnalysisToken(leadId);
   if (provided.length !== expected.length) return false;
   return timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
-}
-
-const MAGIC_JPEG = [0xff, 0xd8, 0xff];
-const MAGIC_PNG  = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-
-function validateMagicBytes(buf: Buffer, type: string): boolean {
-  if (type === 'image/jpeg') return MAGIC_JPEG.every((b, i) => buf[i] === b);
-  if (type === 'image/png')  return MAGIC_PNG.every((b, i) => buf[i] === b);
-  if (type === 'image/webp') return buf.slice(0, 4).toString('ascii') === 'RIFF' && buf.slice(8, 12).toString('ascii') === 'WEBP';
-  return false;
 }
 
 export const maxDuration = 60;
@@ -263,13 +253,15 @@ export async function POST(
       return NextResponse.json({ message: 'Conteúdo do arquivo não corresponde ao tipo declarado.' }, { status: 415 });
     }
 
-    type Landmark = { x: number; y: number; z: number };
-    let landmarks: Landmark[] | null = null;
+    let landmarks = null;
     if (landmarksJson) {
       try {
-        landmarks = JSON.parse(landmarksJson) as Landmark[] | null;
+        landmarks = validateLandmarks(JSON.parse(landmarksJson));
       } catch {
         return NextResponse.json({ message: 'Formato de landmarks inválido.' }, { status: 400 });
+      }
+      if (landmarks === null) {
+        return NextResponse.json({ message: 'Estrutura de landmarks inválida.' }, { status: 400 });
       }
     }
 
@@ -306,7 +298,7 @@ export async function POST(
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error('[leads/analise]', err);
+    console.error('[leads/analise]', err instanceof Error ? err.message : 'unknown error');
     return NextResponse.json({ message: 'Erro interno.' }, { status: 500 });
   }
 }

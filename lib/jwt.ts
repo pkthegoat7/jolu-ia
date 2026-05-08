@@ -1,7 +1,8 @@
 import jwt from 'jsonwebtoken';
 
-if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
-  throw new Error('JWT_SECRET environment variable must be set in production');
+if (process.env.NODE_ENV === 'production') {
+  if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET must be set in production');
+  if (!process.env.ANALYSIS_TOKEN_SECRET) throw new Error('ANALYSIS_TOKEN_SECRET must be set in production');
 }
 
 const SECRET = process.env.JWT_SECRET ?? 'fallback_dev_secret';
@@ -24,6 +25,13 @@ export function signJwt(payload: object): string {
 
 export function verifyJwt(token: string): Record<string, unknown> {
   return jwt.verify(token, SECRET) as Record<string, unknown>;
+}
+
+export function requireAdmin(request: Request): Record<string, unknown> | null {
+  const user = getAuthUser(request);
+  if (!user) return null;
+  if (user.role !== 'ADMIN') return null;
+  return user;
 }
 
 export function getAuthUser(request: Request): Record<string, unknown> | null {

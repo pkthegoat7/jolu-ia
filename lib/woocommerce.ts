@@ -1,4 +1,5 @@
 import type { ResultadoAnalise } from './analise';
+import { assertSafeUrl } from './ssrf';
 
 function wcAuth(): string {
   const key = process.env.WC_CONSUMER_KEY;
@@ -10,6 +11,7 @@ function wcAuth(): string {
 async function wcFetch(endpoint: string, options?: RequestInit) {
   const base = process.env.WC_URL;
   if (!base) throw new Error('WC_URL não definida.');
+  assertSafeUrl(base);
 
   const res = await fetch(`${base}/wp-json/wc/v3${endpoint}`, {
     ...options,

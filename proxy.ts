@@ -1,10 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Presence of the HttpOnly cookie means the user authenticated via the server.
-// Full JWT signature verification happens in every API route handler.
-export function proxy(request: NextRequest) {
+async function verifyJwt(token: string, secret: string): Promise<boolean> {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+    const [header, payload, sig] = parts;
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify'],
+    );
+    const data = encoder.encode(`${header}.${payload}`);
+    const sigBytes = Uint8Array.from(
+      atob(sig.replace(/-/g, '+').replace(/_/g, '/')),
+      (c) => c.charCodeAt(0),
+    );
+    const valid = await crypto.subtle.verify('HMAC', key, sigBytes, data);
+    if (!valid) return false;
+    const claims = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+    if (claims.exp && Date.now() / 1000 > claims.exp) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function proxy(request: NextRequest) {
   const token = request.cookies.get('admin_token')?.value;
   if (!token) {
+    return NextResponse.redirect(new URL('/admin', request.url));
+  }
+  const secret = process.env.JWT_SECRET ?? 'fallback_dev_secret';
+  const valid = await verifyJwt(token, secret);
+  if (!valid) {
     return NextResponse.redirect(new URL('/admin', request.url));
   }
   return NextResponse.next();

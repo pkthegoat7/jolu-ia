@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getAuthUser } from '@/lib/jwt';
+import { requireAdmin } from '@/lib/jwt';
 import { prisma } from '@/lib/prisma';
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!getAuthUser(request)) {
+  if (!requireAdmin(request)) {
     return NextResponse.json({ message: 'Não autorizado.' }, { status: 401 });
   }
 
@@ -29,7 +29,7 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!getAuthUser(request)) {
+  if (!requireAdmin(request)) {
     return NextResponse.json({ message: 'Não autorizado.' }, { status: 401 });
   }
 

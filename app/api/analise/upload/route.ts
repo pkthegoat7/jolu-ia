@@ -1,16 +1,16 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
-import { getAuthUser } from '@/lib/jwt';
-import { analisarImagem, uploadToSupabase } from '@/lib/analise';
+import { requireAdmin } from '@/lib/jwt';
+import { analisarImagem, uploadToSupabase, validateMagicBytes, validateLandmarks } from '@/lib/analise';
 import { prisma } from '@/lib/prisma';
 
 export const maxDuration = 60;
 
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
-const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_BYTES = 10 * 1024 * 1024;
 
 export async function POST(request: Request) {
-  const user = getAuthUser(request);
+  const user = requireAdmin(request);
   if (!user) {
     return NextResponse.json({ message: 'Não autorizado.' }, { status: 401 });
   }
@@ -34,18 +34,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Arquivo muito grande. Máximo 10 MB.' }, { status: 413 });
     }
 
-    const landmarks = landmarksJson ? JSON.parse(landmarksJson) : null;
+    if (!validateMagicBytes(buffer, file.type)) {
+      return NextResponse.json({ message: 'Conteúdo do arquivo não corresponde ao tipo declarado.' }, { status: 415 });
+    }
 
-    // Use UUID — never trust the client-supplied filename
-    const filePath = `fotos/${randomUUID()}.jpg`;
-    const publicUrl = await uploadToSupabase(buffer, filePath, 'image/jpeg');
-
-    const resultado = await analisarImagem(buffer, landmarks);
+    let landmarks = null;
+    if (landmarksJson) {
+      try {
+        landmarks = validateLandmarks(JSON.parse(landmarksJson));
+      } catch {
+        return NextResponse.json({ message: 'Formato de landmarks inválido.' }, { status: 400 });
+      }
+    }
 
     const userId = typeof user.sub === 'string' ? user.sub : null;
     if (!userId) {
       return NextResponse.json({ message: 'Token inválido.' }, { status: 401 });
     }
+
+    const filePath = `fotos/${randomUUID()}.jpg`;
+    const publicUrl = await uploadToSupabase(buffer, filePath, 'image/jpeg');
+
+    const resultado = await analisarImagem(buffer, landmarks);
+
     const analise = await prisma.analise.create({
       data: { userId, imageUrl: publicUrl, resultado },
       include: { usuario: { select: { name: true } } },
@@ -53,7 +64,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(analise);
   } catch (err) {
-    console.error('[analise/upload]', err);
+    console.error('[analise/upload]', err instanceof Error ? err.message : 'unknown error');
     return NextResponse.json({ message: 'Erro ao processar análise.' }, { status: 500 });
   }
 }

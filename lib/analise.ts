@@ -33,6 +33,28 @@ Required JSON schema:
   "observacoes": "<1-2 sentences in Portuguese describing what you actually observed>"
 }`;
 
+const MAGIC_JPEG = [0xff, 0xd8, 0xff];
+const MAGIC_PNG  = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+export function validateMagicBytes(buf: Buffer, type: string): boolean {
+  if (type === 'image/jpeg') return MAGIC_JPEG.every((b, i) => buf[i] === b);
+  if (type === 'image/png')  return MAGIC_PNG.every((b, i) => buf[i] === b);
+  if (type === 'image/webp') return buf.slice(0, 4).toString('ascii') === 'RIFF' && buf.slice(8, 12).toString('ascii') === 'WEBP';
+  return false;
+}
+
+export function validateLandmarks(data: unknown): Landmark[] | null {
+  if (!Array.isArray(data) || data.length === 0) return null;
+  const valid = data.every(
+    (l) =>
+      typeof l === 'object' && l !== null &&
+      Number.isFinite((l as Landmark).x) &&
+      Number.isFinite((l as Landmark).y) &&
+      Number.isFinite((l as Landmark).z),
+  );
+  return valid ? (data as Landmark[]) : null;
+}
+
 function getSupabase() {
   return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_KEY!);
 }
@@ -165,16 +187,14 @@ function recomendacoesPara(tipoPele: string) {
   return mapa[tipoPele] ?? mapa['Mista'];
 }
 
-function fallbackPorBuffer(imageBuffer: Buffer): ResultadoAnalise {
-  const bucket = imageBuffer.length % 3;
-  const tipos = ['Oleosa', 'Mista', 'Seca/Sensivel'];
-  const tipoPele = tipos[bucket];
+function fallbackPorBuffer(): ResultadoAnalise {
+  const tipoPele = 'Mista';
   return {
     status: 'Concluido',
     tipoPele,
-    nivelOleosidade: bucket === 0 ? 'Alta' : bucket === 1 ? 'Media' : 'Baixa',
-    nivelAcne: bucket === 0 ? 'Moderada' : 'Leve',
-    nivelSensibilidade: bucket === 2 ? 'Alta' : 'Baixa',
+    nivelOleosidade: 'Media',
+    nivelAcne: 'Leve',
+    nivelSensibilidade: 'Media',
     observacoes: 'Análise estimada — serviço de IA indisponível no momento.',
     recomendacoes: recomendacoesPara(tipoPele),
     modoFallback: true,
@@ -194,7 +214,7 @@ export async function analisarImagem(
 
   const parsed = await analisarComGemini(base64Image);
 
-  if (!parsed) return fallbackPorBuffer(imageBuffer);
+  if (!parsed) return fallbackPorBuffer();
 
   const tipoPele = parsed.tipoPele ?? 'Mista';
   return {

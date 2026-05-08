@@ -18,6 +18,9 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+    if (password.length > 1024) {
+      return NextResponse.json({ message: 'Senha muito longa.' }, { status: 400 });
+    }
 
     const salt = await bcrypt.genSalt();
     const passwordHash = await bcrypt.hash(password, salt);
