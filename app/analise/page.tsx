@@ -36,6 +36,63 @@ function computeGuidance(lm: Array<{ x: number; y: number; z: number }> | null):
   return { message: 'Perfeito! Clique em Analisar', status: 'ok', arrow: null };
 }
 
+// ── Blur Overlay (canvas-based, works cross-browser) ─────────────────
+function BlurOverlay({ videoRef, camOn }: {
+  videoRef: React.RefObject<HTMLVideoElement | null>;
+  camOn: boolean;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (!camOn) return;
+    let raf = 0;
+    const draw = () => {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      if (!video || !canvas || video.readyState < 2 || video.videoWidth === 0) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
+      const w = video.videoWidth;
+      const h = video.videoHeight;
+      if (canvas.width !== w) canvas.width = w;
+      if (canvas.height !== h) canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      // 1. Draw blurred video over entire canvas
+      ctx.filter = `blur(${Math.round(w * 0.018)}px)`;
+      ctx.drawImage(video, 0, 0, w, h);
+      ctx.filter = 'none';
+
+      // 2. Darken the blurred area
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = 'rgba(8,3,6,0.45)';
+      ctx.fillRect(0, 0, w, h);
+
+      // 3. Cut transparent oval — raw video shows through from the layer below
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.beginPath();
+      // Matches SVG ellipse: cx=50/100, cy=37/75, rx=24/100, ry=32/75
+      ctx.ellipse(w * 0.5, h * (37 / 75), w * 0.24, h * (32 / 75), 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+
+      raf = requestAnimationFrame(draw);
+    };
+    raf = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(raf);
+  }, [camOn, videoRef]);
+
+  if (!camOn) return null;
+  return (
+    <canvas
+      ref={canvasRef}
+      className="absolute inset-0 w-full h-full pointer-events-none"
+    />
+  );
+}
+
 // ── Guidance Overlay ──────────────────────────────────────────────────
 function GuidanceOverlay({ guidance, camOn }: { guidance: Guidance; camOn: boolean }) {
   if (!camOn) return null;
@@ -69,26 +126,8 @@ function GuidanceOverlay({ guidance, camOn }: { guidance: Guidance; camOn: boole
     );
   };
 
-  // SVG mask: white = blur visible, black = transparent (no blur inside oval)
-  const maskSvg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 75'%3E%3Crect width='100' height='75' fill='white'/%3E%3Cellipse cx='50' cy='37' rx='24' ry='32' fill='black'/%3E%3C/svg%3E")`;
-
   return (
     <div className="absolute inset-0 pointer-events-none">
-      {/* Blur + dim outside oval */}
-      <div
-        className="absolute inset-0"
-        style={{
-          backdropFilter: 'blur(10px)',
-          WebkitBackdropFilter: 'blur(10px)',
-          background: 'rgba(10,4,8,0.38)',
-          maskImage: maskSvg,
-          WebkitMaskImage: maskSvg,
-          maskSize: '100% 100%',
-          WebkitMaskSize: '100% 100%',
-          maskRepeat: 'no-repeat',
-          WebkitMaskRepeat: 'no-repeat',
-        }}
-      />
       {/* Oval guide */}
       <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 75" preserveAspectRatio="none">
         <ellipse cx="50" cy="37" rx="24" ry="32"
@@ -440,6 +479,7 @@ function AnalisePage() {
           <div className="p-4">
             <div className="relative overflow-hidden rounded-xl" style={{ aspectRatio: '4/3' }}>
               <video ref={videoRef} autoPlay muted playsInline className="h-full w-full object-cover" />
+              <BlurOverlay videoRef={videoRef} camOn={camOn} />
               <canvas ref={canvasRef} className="absolute inset-0 h-full w-full pointer-events-none" />
               <CornerBrackets lit={faceReady} />
               <GuidanceOverlay guidance={guidance} camOn={camOn} />
