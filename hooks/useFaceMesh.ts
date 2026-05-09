@@ -14,6 +14,7 @@ export function useFaceMesh(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
   onFaceDetected?: (detected: boolean) => void,
   onFaceLandmarks?: (lm: Landmark[] | null) => void,
+  drawMesh = false,
 ) {
   const landmarkerRef = useRef<FaceLandmarker | null>(null);
   const FLClassRef = useRef<typeof FaceLandmarker | null>(null);
@@ -57,7 +58,7 @@ export function useFaceMesh(
     onFaceRef.current?.(detected);
     onLandmarksRef.current?.(latestLandmarksRef.current);
 
-    if (detected && drawingRef.current && FLClassRef.current) {
+    if (drawMesh && detected && drawingRef.current && FLClassRef.current) {
       const FL = FLClassRef.current;
       for (const lm of results.faceLandmarks) {
         drawingRef.current.drawConnectors(lm, FL.FACE_LANDMARKS_TESSELATION, {
