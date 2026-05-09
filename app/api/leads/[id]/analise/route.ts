@@ -66,56 +66,238 @@ async function enviarEmailProtocolo(
     return;
   }
 
+  function nivelBadge(nivel: string): string {
+    const alto  = ['Alta', 'Severa', 'Moderada'];
+    const medio = ['Media', 'Leve'];
+    if (alto.includes(nivel))  return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#fce4ec;color:#b71c1c;">${escapeHtml(nivel)}</span>`;
+    if (medio.includes(nivel)) return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#fff8e1;color:#e65100;">${escapeHtml(nivel)}</span>`;
+    return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#e8f5e9;color:#1b5e20;">${escapeHtml(nivel)}</span>`;
+  }
+
   const produtosHtml = resultado.recomendacoes
     .map(
       (p, i) => `
-      <div style="margin-bottom:16px;padding:16px;background:#fdf8fb;border-left:3px solid #b96f8d;border-radius:8px;">
-        <p style="margin:0 0 6px;font-weight:700;color:#4a2435;">${i + 1}. ${escapeHtml(p.nome)}</p>
-        <p style="margin:0 0 4px;color:#7a5060;font-size:14px;">${escapeHtml(p.motivo)}</p>
-        <p style="margin:0;color:#9a7282;font-size:13px;"><strong>Modo de uso:</strong> ${escapeHtml(p.modoDeUso)}</p>
-      </div>`,
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:14px;border-radius:12px;overflow:hidden;border:1px solid #f0dde6;">
+        <tr>
+          <td width="48" valign="top" style="padding:16px 0 16px 16px;">
+            <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#4a2435,#b96f8d);color:#fff;font-size:15px;font-weight:700;text-align:center;line-height:36px;">${i + 1}</div>
+          </td>
+          <td valign="top" style="padding:16px 16px 16px 12px;">
+            <p style="margin:0 0 4px;font-size:14px;font-weight:700;color:#4a2435;">${escapeHtml(p.nome)}</p>
+            <p style="margin:0 0 8px;font-size:13px;color:#7a5060;line-height:1.5;">${escapeHtml(p.motivo)}</p>
+            <p style="margin:0;font-size:12px;color:#b96f8d;background:#fdf8fb;border-radius:6px;padding:6px 10px;display:inline-block;">
+              <strong style="color:#4a2435;">Como usar:</strong> ${escapeHtml(p.modoDeUso)}
+            </p>
+          </td>
+        </tr>
+      </table>`,
     )
     .join('');
 
-  const html = `
-    <!DOCTYPE html>
-    <html lang="pt-BR">
-    <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-    <body style="margin:0;padding:0;background:#f7f0f3;font-family:Inter,Arial,sans-serif;">
-      <div style="max-width:580px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(74,36,53,.10);">
-        <div style="background:linear-gradient(135deg,#4a2435,#b96f8d);padding:32px 32px 24px;text-align:center;">
-          <p style="margin:0 0 4px;font-size:11px;letter-spacing:0.3em;text-transform:uppercase;color:rgba(255,255,255,.6);">Patrícia Elias</p>
-          <h1 style="margin:0;font-size:26px;font-weight:300;color:#fff;letter-spacing:-0.5px;">Seu Protocolo de Pele</h1>
-        </div>
-        <div style="padding:32px;">
-          <p style="margin:0 0 20px;font-size:16px;color:#4a2435;">Olá, <strong>${escapeHtml(nome)}</strong>!</p>
-          <p style="margin:0 0 24px;font-size:14px;color:#7a5060;line-height:1.6;">
-            Sua análise facial foi concluída. Abaixo está seu diagnóstico completo e o protocolo de cuidados personalizado para você.
-          </p>
-          <div style="background:#f7f0f3;border-radius:12px;padding:20px;margin-bottom:24px;">
-            <p style="margin:0 0 12px;font-size:10px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:#b8a0ac;">Diagnóstico</p>
-            <table style="width:100%;border-collapse:collapse;">
-              <tr><td style="padding:6px 0;font-size:13px;color:#9a7282;width:140px;">Tipo de Pele</td><td style="padding:6px 0;font-size:13px;font-weight:600;color:#4a2435;">${escapeHtml(resultado.tipoPele)}</td></tr>
-              <tr><td style="padding:6px 0;font-size:13px;color:#9a7282;">Oleosidade</td><td style="padding:6px 0;font-size:13px;font-weight:600;color:#4a2435;">${escapeHtml(resultado.nivelOleosidade)}</td></tr>
-              <tr><td style="padding:6px 0;font-size:13px;color:#9a7282;">Acne</td><td style="padding:6px 0;font-size:13px;font-weight:600;color:#4a2435;">${escapeHtml(resultado.nivelAcne)}</td></tr>
-              <tr><td style="padding:6px 0;font-size:13px;color:#9a7282;">Sensibilidade</td><td style="padding:6px 0;font-size:13px;font-weight:600;color:#4a2435;">${escapeHtml(resultado.nivelSensibilidade)}</td></tr>
+  const ano = new Date().getFullYear();
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Seu Protocolo de Pele — Patrícia Elias</title>
+</head>
+<body style="margin:0;padding:0;background:#f3e8ee;font-family:Georgia,'Times New Roman',serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f3e8ee;padding:32px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 8px 40px rgba(74,36,53,.13);">
+
+  <!-- HEADER -->
+  <tr>
+    <td style="background:linear-gradient(150deg,#3b1a28 0%,#6d2b45 50%,#b96f8d 100%);padding:0;">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="padding:40px 40px 16px;text-align:center;">
+            <p style="margin:0 0 6px;font-size:10px;letter-spacing:0.35em;text-transform:uppercase;color:rgba(255,255,255,.55);font-family:Arial,sans-serif;">Patrícia Elias · Skin Intelligence</p>
+            <h1 style="margin:0;font-size:30px;font-weight:400;color:#fff;letter-spacing:0.5px;line-height:1.2;">Seu Protocolo<br><em>Personalizado de Pele</em></h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:0 40px 40px;text-align:center;">
+            <div style="display:inline-block;width:48px;height:1px;background:rgba(255,255,255,.3);vertical-align:middle;"></div>
+            <span style="display:inline-block;margin:0 12px;font-size:18px;color:rgba(255,255,255,.5);">✦</span>
+            <div style="display:inline-block;width:48px;height:1px;background:rgba(255,255,255,.3);vertical-align:middle;"></div>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- SAUDAÇÃO -->
+  <tr>
+    <td style="padding:36px 40px 0;">
+      <p style="margin:0 0 12px;font-size:22px;font-weight:400;color:#4a2435;">Olá, <strong>${escapeHtml(nome)}</strong> 🌸</p>
+      <p style="margin:0;font-size:14px;color:#7a5060;line-height:1.8;font-family:Arial,sans-serif;">
+        Sua análise facial com inteligência artificial foi concluída com sucesso.<br>
+        Preparamos um diagnóstico completo e um protocolo de cuidados exclusivo,<br>
+        desenvolvido especialmente para o seu tipo de pele.
+      </p>
+    </td>
+  </tr>
+
+  <!-- DIVISOR -->
+  <tr>
+    <td style="padding:28px 40px 0;">
+      <div style="height:1px;background:linear-gradient(to right,transparent,#e0c8d4,transparent);"></div>
+    </td>
+  </tr>
+
+  <!-- DIAGNÓSTICO TÍTULO -->
+  <tr>
+    <td style="padding:28px 40px 16px;">
+      <p style="margin:0 0 4px;font-size:10px;font-weight:700;letter-spacing:0.25em;text-transform:uppercase;color:#b96f8d;font-family:Arial,sans-serif;">Diagnóstico Facial</p>
+      <p style="margin:0;font-size:18px;color:#4a2435;font-weight:400;">Resultado da sua análise</p>
+    </td>
+  </tr>
+
+  <!-- TIPO DE PELE DESTAQUE -->
+  <tr>
+    <td style="padding:0 40px 20px;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,#fdf2f7,#f7e8f0);border-radius:14px;border:1px solid #f0dde6;">
+        <tr>
+          <td style="padding:20px 24px;">
+            <p style="margin:0 0 6px;font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:#b96f8d;font-family:Arial,sans-serif;">Tipo de Pele Identificado</p>
+            <p style="margin:0;font-size:26px;font-weight:400;color:#4a2435;">${escapeHtml(resultado.tipoPele)}</p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- MÉTRICAS 2x2 -->
+  <tr>
+    <td style="padding:0 40px 8px;">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td width="48%" valign="top" style="padding-right:8px;padding-bottom:12px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #f0dde6;border-radius:12px;">
+              <tr>
+                <td style="padding:16px 18px;">
+                  <p style="margin:0 0 6px;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:#b8a0ac;font-family:Arial,sans-serif;">Oleosidade</p>
+                  ${nivelBadge(resultado.nivelOleosidade)}
+                </td>
+              </tr>
             </table>
-            ${resultado.observacoes && !resultado.modoFallback
-              ? `<p style="margin:12px 0 0;font-size:13px;font-style:italic;color:#9a7282;border-left:2px solid #c07898;padding-left:12px;">"${escapeHtml(resultado.observacoes)}"</p>`
-              : ''}
-          </div>
-          <p style="margin:0 0 14px;font-size:10px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:#b8a0ac;">Protocolo Recomendado</p>
-          ${produtosHtml}
-          <p style="margin:24px 0 0;font-size:13px;color:#9a7282;line-height:1.6;">
-            Em caso de dúvidas, entre em contato com Patrícia Elias diretamente.
-          </p>
-        </div>
-        <div style="padding:20px 32px;background:#f7f0f3;text-align:center;border-top:1px solid #e8d0db;">
-          <p style="margin:0;font-size:11px;color:#b8a0ac;">© ${new Date().getFullYear()} Patrícia Elias · Skin Intelligence</p>
-        </div>
-      </div>
-    </body>
-    </html>`;
+          </td>
+          <td width="48%" valign="top" style="padding-left:8px;padding-bottom:12px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #f0dde6;border-radius:12px;">
+              <tr>
+                <td style="padding:16px 18px;">
+                  <p style="margin:0 0 6px;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:#b8a0ac;font-family:Arial,sans-serif;">Acne</p>
+                  ${nivelBadge(resultado.nivelAcne)}
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td width="48%" valign="top" style="padding-right:8px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #f0dde6;border-radius:12px;">
+              <tr>
+                <td style="padding:16px 18px;">
+                  <p style="margin:0 0 6px;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:#b8a0ac;font-family:Arial,sans-serif;">Sensibilidade</p>
+                  ${nivelBadge(resultado.nivelSensibilidade)}
+                </td>
+              </tr>
+            </table>
+          </td>
+          <td width="48%" valign="top" style="padding-left:8px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #f0dde6;border-radius:12px;">
+              <tr>
+                <td style="padding:16px 18px;">
+                  <p style="margin:0 0 6px;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:#b8a0ac;font-family:Arial,sans-serif;">Status</p>
+                  <span style="display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#e8f5e9;color:#1b5e20;">Concluído</span>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- OBSERVAÇÕES DA IA -->
+  ${resultado.observacoes && !resultado.modoFallback ? `
+  <tr>
+    <td style="padding:8px 40px 0;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf8fb;border-radius:12px;border-left:4px solid #b96f8d;">
+        <tr>
+          <td style="padding:18px 20px;">
+            <p style="margin:0 0 6px;font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:#b96f8d;font-family:Arial,sans-serif;">Observação da IA</p>
+            <p style="margin:0;font-size:13px;font-style:italic;color:#5a3545;line-height:1.7;font-family:Georgia,serif;">"${escapeHtml(resultado.observacoes)}"</p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>` : ''}
+
+  <!-- DIVISOR -->
+  <tr>
+    <td style="padding:28px 40px 0;">
+      <div style="height:1px;background:linear-gradient(to right,transparent,#e0c8d4,transparent);"></div>
+    </td>
+  </tr>
+
+  <!-- PROTOCOLO TÍTULO -->
+  <tr>
+    <td style="padding:28px 40px 16px;">
+      <p style="margin:0 0 4px;font-size:10px;font-weight:700;letter-spacing:0.25em;text-transform:uppercase;color:#b96f8d;font-family:Arial,sans-serif;">Protocolo Exclusivo</p>
+      <p style="margin:0;font-size:18px;color:#4a2435;font-weight:400;">Produtos recomendados para você</p>
+    </td>
+  </tr>
+
+  <!-- PRODUTOS -->
+  <tr>
+    <td style="padding:0 40px;">
+      ${produtosHtml}
+    </td>
+  </tr>
+
+  <!-- CTA -->
+  <tr>
+    <td style="padding:28px 40px 0;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,#4a2435,#b96f8d);border-radius:14px;">
+        <tr>
+          <td style="padding:24px 28px;text-align:center;">
+            <p style="margin:0 0 6px;font-size:13px;color:rgba(255,255,255,.8);font-family:Arial,sans-serif;">Dúvidas sobre seu protocolo?</p>
+            <p style="margin:0;font-size:16px;font-weight:700;color:#fff;font-family:Arial,sans-serif;">Entre em contato com Patrícia Elias</p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- NOTA DE RODAPÉ -->
+  <tr>
+    <td style="padding:24px 40px 0;">
+      <p style="margin:0;font-size:12px;color:#b8a0ac;line-height:1.6;font-family:Arial,sans-serif;text-align:center;">
+        Este protocolo foi gerado por inteligência artificial com base em sua análise facial.<br>
+        Para um diagnóstico aprofundado, consulte sempre uma dermatologista.
+      </p>
+    </td>
+  </tr>
+
+  <!-- FOOTER -->
+  <tr>
+    <td style="padding:28px 40px 36px;text-align:center;">
+      <div style="height:1px;background:linear-gradient(to right,transparent,#e0c8d4,transparent);margin-bottom:24px;"></div>
+      <p style="margin:0 0 4px;font-size:13px;color:#4a2435;font-weight:600;font-family:Arial,sans-serif;">Patrícia Elias · Skin Intelligence</p>
+      <p style="margin:0;font-size:11px;color:#c0a0ac;font-family:Arial,sans-serif;">© ${ano} · Todos os direitos reservados</p>
+    </td>
+  </tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
 
   const transporter = nodemailer.createTransport({
     service: 'gmail',
