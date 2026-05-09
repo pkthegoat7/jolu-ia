@@ -69,8 +69,26 @@ function GuidanceOverlay({ guidance, camOn }: { guidance: Guidance; camOn: boole
     );
   };
 
+  // SVG mask: white = blur visible, black = transparent (no blur inside oval)
+  const maskSvg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 75'%3E%3Crect width='100' height='75' fill='white'/%3E%3Cellipse cx='50' cy='37' rx='24' ry='32' fill='black'/%3E%3C/svg%3E")`;
+
   return (
     <div className="absolute inset-0 pointer-events-none">
+      {/* Blur + dim outside oval */}
+      <div
+        className="absolute inset-0"
+        style={{
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
+          background: 'rgba(10,4,8,0.38)',
+          maskImage: maskSvg,
+          WebkitMaskImage: maskSvg,
+          maskSize: '100% 100%',
+          WebkitMaskSize: '100% 100%',
+          maskRepeat: 'no-repeat',
+          WebkitMaskRepeat: 'no-repeat',
+        }}
+      />
       {/* Oval guide */}
       <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 75" preserveAspectRatio="none">
         <ellipse cx="50" cy="37" rx="24" ry="32"
