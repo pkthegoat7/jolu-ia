@@ -5,6 +5,94 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { apiUrl } from '@/lib/api';
 import { useFaceMesh } from '@/hooks/useFaceMesh';
 
+// ── Face Guidance ─────────────────────────────────────────────────────
+type GuidanceStatus = 'waiting' | 'warn' | 'ok';
+type GuidanceArrow = 'up' | 'down' | 'left' | 'right' | 'in' | 'out' | null;
+type Guidance = { message: string; status: GuidanceStatus; arrow: GuidanceArrow };
+
+function computeGuidance(lm: Array<{ x: number; y: number; z: number }> | null): Guidance {
+  const waiting: Guidance = { message: 'Posicione seu rosto na câmera', status: 'waiting', arrow: null };
+  if (!lm || lm.length < 454) return waiting;
+
+  const nose     = lm[4];
+  const forehead = lm[10];
+  const chin     = lm[152];
+  const leftEye  = lm[33];
+  const rightEye = lm[263];
+
+  const faceHeight = Math.abs(chin.y - forehead.y);
+  const cx = nose.x;
+  const cy = nose.y;
+  const tilt = Math.abs(Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x) * (180 / Math.PI));
+
+  if (faceHeight < 0.22) return { message: 'Aproxime o rosto da câmera', status: 'warn', arrow: 'in' };
+  if (faceHeight > 0.72) return { message: 'Afaste o rosto da câmera',   status: 'warn', arrow: 'out' };
+  if (cx < 0.37)         return { message: 'Mova o rosto para a direita', status: 'warn', arrow: 'right' };
+  if (cx > 0.63)         return { message: 'Mova o rosto para a esquerda',status: 'warn', arrow: 'left' };
+  if (cy < 0.28)         return { message: 'Abaixe levemente o rosto',    status: 'warn', arrow: 'down' };
+  if (cy > 0.68)         return { message: 'Levante levemente o rosto',   status: 'warn', arrow: 'up' };
+  if (tilt > 12)         return { message: 'Endireite levemente a cabeça', status: 'warn', arrow: null };
+
+  return { message: 'Perfeito! Clique em Analisar', status: 'ok', arrow: null };
+}
+
+// ── Guidance Overlay ──────────────────────────────────────────────────
+function GuidanceOverlay({ guidance, camOn }: { guidance: Guidance; camOn: boolean }) {
+  if (!camOn) return null;
+  const color = guidance.status === 'ok' ? '#34d399' : guidance.status === 'warn' ? '#fb923c' : 'rgba(255,255,255,0.18)';
+  const dash  = guidance.status === 'waiting' ? '4 3' : undefined;
+
+  const Arrow = ({ dir }: { dir: GuidanceArrow }) => {
+    if (!dir) return null;
+    const paths: Record<string, string> = {
+      up:    'M12 19V5m0 0-5 5m5-5 5 5',
+      down:  'M12 5v14m0 0-5-5m5 5 5-5',
+      left:  'M19 12H5m0 0 5-5m-5 5 5 5',
+      right: 'M5 12h14m0 0-5-5m5 5-5 5',
+      in:    'M21 21l-6-6m6 6v-4m0 4h-4M3 3l6 6M3 3v4m0-4h4',
+      out:   'M3 3l18 18M3 21l18-18',
+    };
+    const positions: Record<string, string> = {
+      up:    'top-2 left-1/2 -translate-x-1/2',
+      down:  'bottom-2 left-1/2 -translate-x-1/2',
+      left:  'left-2 top-1/2 -translate-y-1/2',
+      right: 'right-2 top-1/2 -translate-y-1/2',
+      in:    'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2',
+      out:   'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2',
+    };
+    return (
+      <div className={`absolute ${positions[dir]} pointer-events-none animate-bounce`}>
+        <svg className="h-7 w-7 drop-shadow-lg" viewBox="0 0 24 24" fill="none" stroke="#fb923c" strokeWidth="2.2" strokeLinecap="round">
+          <path d={paths[dir]} />
+        </svg>
+      </div>
+    );
+  };
+
+  return (
+    <div className="absolute inset-0 pointer-events-none">
+      {/* Oval guide */}
+      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 75" preserveAspectRatio="none">
+        <ellipse cx="50" cy="37" rx="24" ry="32"
+          fill="none"
+          stroke={color}
+          strokeWidth="0.6"
+          strokeDasharray={dash}
+          style={{ transition: 'stroke 0.4s ease' }}
+        />
+        {guidance.status === 'ok' && (
+          <ellipse cx="50" cy="37" rx="24" ry="32"
+            fill="none" stroke={color} strokeWidth="0.4" opacity="0.3"
+            style={{ animation: 'pulse 1.5s ease-in-out infinite' }}
+          />
+        )}
+      </svg>
+      {/* Direction arrow */}
+      <Arrow dir={guidance.arrow} />
+    </div>
+  );
+}
+
 // ── Corner Brackets ──────────────────────────────────────────────────
 function CornerBrackets({ lit }: { lit: boolean }) {
   const c = lit ? 'border-[#c07898]/90' : 'border-white/18';
@@ -74,9 +162,23 @@ function AnalisePage() {
   const [faceDet, setFaceDet] = useState(false);
   const [meshReady, setMeshReady] = useState(false);
   const [scanStatus, setScanStatus] = useState('');
+  const [guidance, setGuidance] = useState<Guidance>({ message: 'Posicione seu rosto na câmera', status: 'waiting', arrow: null });
+  const [faceReady, setFaceReady] = useState(false);
+  const okFramesRef = useRef(0);
 
   const onFace = useCallback((d: boolean) => setFaceDet(d), []);
-  const { start: startMesh, stop: stopMesh, getLandmarks } = useFaceMesh(videoRef, canvasRef, onFace);
+  const onLandmarks = useCallback((lm: Array<{ x: number; y: number; z: number }> | null) => {
+    const g = computeGuidance(lm);
+    setGuidance(g);
+    if (g.status === 'ok') {
+      okFramesRef.current += 1;
+      if (okFramesRef.current >= 10) setFaceReady(true);
+    } else {
+      okFramesRef.current = 0;
+      setFaceReady(false);
+    }
+  }, []);
+  const { start: startMesh, stop: stopMesh, getLandmarks } = useFaceMesh(videoRef, canvasRef, onFace, onLandmarks);
 
   // ── Validate token on mount ──────────────────────────────────────
   useEffect(() => {
@@ -124,6 +226,9 @@ function AnalisePage() {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         setCamOn(true);
+        setFaceReady(false);
+        okFramesRef.current = 0;
+        setGuidance({ message: 'Posicione seu rosto na câmera', status: 'waiting', arrow: null });
         setScanStatus('Carregando Face Mesh...');
         await startMesh();
         setMeshReady(true);
@@ -318,23 +423,23 @@ function AnalisePage() {
             <div className="relative overflow-hidden rounded-xl" style={{ aspectRatio: '4/3' }}>
               <video ref={videoRef} autoPlay muted playsInline className="h-full w-full object-cover" />
               <canvas ref={canvasRef} className="absolute inset-0 h-full w-full pointer-events-none" />
-              <CornerBrackets lit={faceDet} />
-
-              {camOn && !faceDet && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="relative" style={{ width: 140, height: 185 }}>
-                    <div className="absolute inset-0 rounded-full" style={{ border: '1px dashed rgba(255,255,255,.16)' }} />
-                    <div className="pulse-ring absolute inset-0 rounded-full" style={{ border: '1px solid rgba(192,120,152,.28)' }} />
-                  </div>
-                </div>
-              )}
+              <CornerBrackets lit={faceReady} />
+              <GuidanceOverlay guidance={guidance} camOn={camOn} />
 
               {meshReady && (
-                <div className={`absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium backdrop-blur-md border transition-all ${
-                  faceDet ? 'bg-emerald-500/12 border-emerald-400/25 text-emerald-300' : 'bg-black/22 border-white/08 text-white/35'
+                <div className={`absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium backdrop-blur-md border transition-all duration-300 whitespace-nowrap ${
+                  guidance.status === 'ok'
+                    ? 'bg-emerald-500/15 border-emerald-400/30 text-emerald-300'
+                    : guidance.status === 'warn'
+                    ? 'bg-orange-500/15 border-orange-400/30 text-orange-300'
+                    : 'bg-black/22 border-white/08 text-white/40'
                 }`}>
-                  <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${faceDet ? 'bg-emerald-400 animate-pulse' : 'bg-white/18'}`} />
-                  {faceDet ? 'Rosto detectado' : 'Aguardando rosto...'}
+                  <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${
+                    guidance.status === 'ok' ? 'bg-emerald-400 animate-pulse'
+                    : guidance.status === 'warn' ? 'bg-orange-400 animate-pulse'
+                    : 'bg-white/18'
+                  }`} />
+                  {guidance.message}
                 </div>
               )}
 
@@ -359,13 +464,13 @@ function AnalisePage() {
             className="btn-ghost flex-1 rounded-2xl py-3.5 text-sm font-semibold">
             {camOn ? 'Reiniciar' : 'Ligar Câmera'}
           </button>
-          <button onClick={analisar} disabled={!camOn || !faceDet}
+          <button onClick={analisar} disabled={!camOn || !faceReady}
             className="btn-brand flex-[2] rounded-2xl py-3.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50">
             Analisar Pele →
           </button>
         </div>
 
-        {scanStatus && (
+        {scanStatus && !meshReady && (
           <p className={`fu3 w-full flex items-center gap-2 text-[13px] font-medium ${scanStatus.includes('Erro') ? 'text-red-500' : 'text-[#8a6070]'}`}>
             <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${scanStatus.includes('Erro') ? 'bg-red-400' : 'bg-[#b96f8d] animate-pulse'}`} />
             {scanStatus}

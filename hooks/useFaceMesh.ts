@@ -7,10 +7,13 @@ const WASM_CDN =
 const MODEL_URL =
   "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
 
+type Landmark = { x: number; y: number; z: number };
+
 export function useFaceMesh(
   videoRef: React.RefObject<HTMLVideoElement | null>,
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
-  onFaceDetected?: (detected: boolean) => void
+  onFaceDetected?: (detected: boolean) => void,
+  onFaceLandmarks?: (lm: Landmark[] | null) => void,
 ) {
   const landmarkerRef = useRef<FaceLandmarker | null>(null);
   const FLClassRef = useRef<typeof FaceLandmarker | null>(null);
@@ -20,6 +23,8 @@ export function useFaceMesh(
   const runningRef = useRef(false);
   const onFaceRef = useRef(onFaceDetected);
   onFaceRef.current = onFaceDetected;
+  const onLandmarksRef = useRef(onFaceLandmarks);
+  onLandmarksRef.current = onFaceLandmarks;
   const latestLandmarksRef = useRef<Array<{ x: number; y: number; z: number }> | null>(null);
 
   const loop = useCallback(() => {
@@ -50,6 +55,7 @@ export function useFaceMesh(
     const detected: boolean = results.faceLandmarks.length > 0;
     latestLandmarksRef.current = detected ? results.faceLandmarks[0] : null;
     onFaceRef.current?.(detected);
+    onLandmarksRef.current?.(latestLandmarksRef.current);
 
     if (detected && drawingRef.current && FLClassRef.current) {
       const FL = FLClassRef.current;
