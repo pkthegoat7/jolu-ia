@@ -165,7 +165,24 @@ function AnalisePage() {
   const [scanStatus, setScanStatus] = useState('');
   const [guidance, setGuidance] = useState<Guidance>({ message: 'Posicione seu rosto na câmera', status: 'waiting', arrow: null });
   const [faceReady, setFaceReady] = useState(false);
+  const [blurBg, setBlurBg] = useState('');
   const okFramesRef = useRef(0);
+  const blurIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const captureBlurFrame = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || video.videoWidth === 0 || video.readyState < 2) return;
+    const scale = 0.25;
+    const w = Math.round(video.videoWidth * scale);
+    const h = Math.round(video.videoHeight * scale);
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const ctx = c.getContext('2d');
+    if (!ctx) return;
+    ctx.filter = 'blur(5px)';
+    ctx.drawImage(video, 0, 0, w, h);
+    setBlurBg(c.toDataURL('image/jpeg', 0.7));
+  }, []);
 
   const onFace = useCallback((d: boolean) => setFaceDet(d), []);
   const onLandmarks = useCallback((lm: Array<{ x: number; y: number; z: number }> | null) => {
@@ -180,6 +197,8 @@ function AnalisePage() {
     }
   }, []);
   const { start: startMesh, stop: stopMesh, getLandmarks } = useFaceMesh(videoRef, canvasRef, onFace, onLandmarks);
+
+  useEffect(() => () => { if (blurIntervalRef.current) clearInterval(blurIntervalRef.current); }, []);
 
   // ── Validate token on mount ──────────────────────────────────────
   useEffect(() => {
@@ -231,10 +250,14 @@ function AnalisePage() {
         setFaceReady(false);
         okFramesRef.current = 0;
         setGuidance({ message: 'Posicione seu rosto na câmera', status: 'waiting', arrow: null });
+        setBlurBg('');
+        if (blurIntervalRef.current) clearInterval(blurIntervalRef.current);
         setScanStatus('Carregando Face Mesh...');
         await startMesh();
         setMeshReady(true);
         setScanStatus('Posicione seu rosto no centro e clique em Analisar.');
+        setTimeout(captureBlurFrame, 400);
+        blurIntervalRef.current = setInterval(captureBlurFrame, 4000);
       }
     } catch {
       setScanStatus('Erro ao acessar câmera. Verifique as permissões.');
@@ -423,11 +446,14 @@ function AnalisePage() {
           style={{ background: 'linear-gradient(145deg,#120a0e 0%,#2a0f1c 40%,#1a0b12 100%)' }}>
           <div className="p-4">
             <div className="relative overflow-hidden rounded-xl" style={{ aspectRatio: '4/3' }}>
-              {/* Blurred background — covers full frame */}
-              <video ref={videoRef} autoPlay muted playsInline
-                className="h-full w-full object-cover"
-                style={{ filter: camOn ? 'blur(14px) brightness(0.5)' : 'none' }} />
-              {/* Sharp layer — clipped to oval, same stream, always aligned */}
+              {/* Base video — used for face detection, covered by blur snapshot */}
+              <video ref={videoRef} autoPlay muted playsInline className="h-full w-full object-cover" />
+              {/* Static blurred snapshot — updated every 4s, zero ongoing GPU cost */}
+              {blurBg && (
+                <img src={blurBg} alt="" aria-hidden
+                  className="absolute inset-0 h-full w-full object-cover pointer-events-none brightness-50" />
+              )}
+              {/* Sharp live video clipped to oval */}
               <video ref={sharpVideoRef} autoPlay muted playsInline
                 className="absolute inset-0 h-full w-full object-cover pointer-events-none"
                 style={{ clipPath: 'ellipse(24% 42.7% at 50% 49.3%)' }} />

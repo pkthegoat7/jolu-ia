@@ -22,6 +22,7 @@ export function useFaceMesh(
   const drawingRef = useRef<DrawingUtils | null>(null);
   const animRef = useRef<number>(0);
   const runningRef = useRef(false);
+  const lastDetectRef = useRef(0);
   const onFaceRef = useRef(onFaceDetected);
   onFaceRef.current = onFaceDetected;
   const onLandmarksRef = useRef(onFaceLandmarks);
@@ -39,6 +40,14 @@ export function useFaceMesh(
       animRef.current = requestAnimationFrame(loop);
       return;
     }
+
+    // Cap detection at 15 fps to reduce CPU/GPU load
+    const now = performance.now();
+    if (now - lastDetectRef.current < 66) {
+      animRef.current = requestAnimationFrame(loop);
+      return;
+    }
+    lastDetectRef.current = now;
 
     if (canvas.width !== video.videoWidth) canvas.width = video.videoWidth;
     if (canvas.height !== video.videoHeight) canvas.height = video.videoHeight;
