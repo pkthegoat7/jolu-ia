@@ -2,10 +2,10 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Patrícia Elias · Skin Intelligence",
+  title: "Jolu AI",
   description: "Análise facial inteligente com IA e Face Mesh",
   manifest: "/manifest.json",
-  appleWebApp: { capable: true, statusBarStyle: "default", title: "PE Skin" },
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "Jolu AI" },
 };
 
 export const viewport: Viewport = {
