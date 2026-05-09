@@ -36,63 +36,6 @@ function computeGuidance(lm: Array<{ x: number; y: number; z: number }> | null):
   return { message: 'Perfeito! Clique em Analisar', status: 'ok', arrow: null };
 }
 
-// ── Blur Overlay (canvas-based, works cross-browser) ─────────────────
-function BlurOverlay({ videoRef, camOn }: {
-  videoRef: React.RefObject<HTMLVideoElement | null>;
-  camOn: boolean;
-}) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    if (!camOn) return;
-    let raf = 0;
-    const draw = () => {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      if (!video || !canvas || video.readyState < 2 || video.videoWidth === 0) {
-        raf = requestAnimationFrame(draw);
-        return;
-      }
-      const w = video.videoWidth;
-      const h = video.videoHeight;
-      if (canvas.width !== w) canvas.width = w;
-      if (canvas.height !== h) canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      // 1. Draw blurred video over entire canvas
-      ctx.filter = `blur(${Math.round(w * 0.025)}px)`;
-      ctx.drawImage(video, 0, 0, w, h);
-      ctx.filter = 'none';
-
-      // 2. Darken the blurred area
-      ctx.fillStyle = 'rgba(8,3,6,0.45)';
-      ctx.fillRect(0, 0, w, h);
-
-      // 3. Clip to oval and draw sharp video inside — avoids unreliable destination-out
-      ctx.save();
-      ctx.beginPath();
-      // Matches SVG ellipse: cx=50/100, cy=37/75, rx=24/100, ry=32/75
-      ctx.ellipse(w * 0.5, h * (37 / 75), w * 0.24, h * (32 / 75), 0, 0, Math.PI * 2);
-      ctx.clip();
-      ctx.drawImage(video, 0, 0, w, h);
-      ctx.restore();
-
-      raf = requestAnimationFrame(draw);
-    };
-    raf = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(raf);
-  }, [camOn, videoRef]);
-
-  if (!camOn) return null;
-  return (
-    <canvas
-      ref={canvasRef}
-      className="absolute inset-0 w-full h-full pointer-events-none"
-    />
-  );
-}
-
 // ── Guidance Overlay ──────────────────────────────────────────────────
 function GuidanceOverlay({ guidance, camOn }: { guidance: Guidance; camOn: boolean }) {
   if (!camOn) return null;
@@ -213,8 +156,9 @@ function AnalisePage() {
   const [formBusy, setFormBusy] = useState(false);
 
   // Camera
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const videoRef      = useRef<HTMLVideoElement>(null);
+  const sharpVideoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef     = useRef<HTMLCanvasElement>(null);
   const [camOn, setCamOn] = useState(false);
   const [faceDet, setFaceDet] = useState(false);
   const [meshReady, setMeshReady] = useState(false);
@@ -282,6 +226,7 @@ function AnalisePage() {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        if (sharpVideoRef.current) sharpVideoRef.current.srcObject = stream;
         setCamOn(true);
         setFaceReady(false);
         okFramesRef.current = 0;
@@ -478,8 +423,14 @@ function AnalisePage() {
           style={{ background: 'linear-gradient(145deg,#120a0e 0%,#2a0f1c 40%,#1a0b12 100%)' }}>
           <div className="p-4">
             <div className="relative overflow-hidden rounded-xl" style={{ aspectRatio: '4/3' }}>
-              <video ref={videoRef} autoPlay muted playsInline className="h-full w-full object-cover" />
-              <BlurOverlay videoRef={videoRef} camOn={camOn} />
+              {/* Blurred background — covers full frame */}
+              <video ref={videoRef} autoPlay muted playsInline
+                className="h-full w-full object-cover"
+                style={{ filter: camOn ? 'blur(14px) brightness(0.5)' : 'none' }} />
+              {/* Sharp layer — clipped to oval, same stream, always aligned */}
+              <video ref={sharpVideoRef} autoPlay muted playsInline
+                className="absolute inset-0 h-full w-full object-cover pointer-events-none"
+                style={{ clipPath: 'ellipse(24% 42.7% at 50% 49.3%)' }} />
               <canvas ref={canvasRef} className="absolute inset-0 h-full w-full pointer-events-none" />
               <CornerBrackets lit={faceReady} />
               <GuidanceOverlay guidance={guidance} camOn={camOn} />
