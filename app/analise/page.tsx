@@ -61,22 +61,22 @@ function BlurOverlay({ videoRef, camOn }: {
       if (!ctx) return;
 
       // 1. Draw blurred video over entire canvas
-      ctx.filter = `blur(${Math.round(w * 0.018)}px)`;
+      ctx.filter = `blur(${Math.round(w * 0.025)}px)`;
       ctx.drawImage(video, 0, 0, w, h);
       ctx.filter = 'none';
 
       // 2. Darken the blurred area
-      ctx.globalCompositeOperation = 'source-over';
       ctx.fillStyle = 'rgba(8,3,6,0.45)';
       ctx.fillRect(0, 0, w, h);
 
-      // 3. Cut transparent oval — raw video shows through from the layer below
-      ctx.globalCompositeOperation = 'destination-out';
+      // 3. Clip to oval and draw sharp video inside — avoids unreliable destination-out
+      ctx.save();
       ctx.beginPath();
       // Matches SVG ellipse: cx=50/100, cy=37/75, rx=24/100, ry=32/75
       ctx.ellipse(w * 0.5, h * (37 / 75), w * 0.24, h * (32 / 75), 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalCompositeOperation = 'source-over';
+      ctx.clip();
+      ctx.drawImage(video, 0, 0, w, h);
+      ctx.restore();
 
       raf = requestAnimationFrame(draw);
     };
