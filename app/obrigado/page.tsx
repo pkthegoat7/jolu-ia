@@ -1,10 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 export default function ObrigadoPage() {
-  const router = useRouter();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -95,10 +93,6 @@ export default function ObrigadoPage() {
           Em caso de dúvidas, entre em contato com Patrícia Elias.
         </p>
 
-        <button onClick={() => router.push('/')}
-          className="btn-ghost rounded-2xl px-8 py-3 text-sm font-semibold">
-          Voltar ao início
-        </button>
       </div>
     </div>
   );
