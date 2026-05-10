@@ -10,7 +10,8 @@
     "mobile:init": "npx cap init \"JoluAI\" \"com.joluai.app\" --web-dir=.next",
     "mobile:add:android": "npx cap add android",
     "mobile:sync": "npx cap sync android",
-    "mobile:open:android": "npx cap open android"
+    "mobile:open:android": "npx cap open android",
+    "test:recomendacoes": "npx tsx scripts/test-recomendacoes.ts"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.1",
