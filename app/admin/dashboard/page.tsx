@@ -186,13 +186,19 @@ export default function AdminDashboard() {
         )}
 
         {/* Tabs */}
-        <div className="flex gap-1 p-1 glass rounded-2xl w-fit">
-          {(['leads', 'tokens', 'config'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)}
-              className={`rounded-xl px-5 py-2 text-[13px] font-semibold transition-all ${tab === t ? 'bg-white shadow-sm text-[#4a2435]' : 'text-[#9a7282] hover:text-[#4a2435]'}`}>
-              {t === 'leads' ? `Leads (${total})` : t === 'tokens' ? 'Campanhas' : 'Configurações'}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex gap-1 p-1 glass rounded-2xl w-fit">
+            {(['leads', 'tokens', 'config'] as const).map(t => (
+              <button key={t} onClick={() => setTab(t)}
+                className={`rounded-xl px-5 py-2 text-[13px] font-semibold transition-all ${tab === t ? 'bg-white shadow-sm text-[#4a2435]' : 'text-[#9a7282] hover:text-[#4a2435]'}`}>
+                {t === 'leads' ? `Leads (${total})` : t === 'tokens' ? 'Campanhas' : 'Configurações'}
+              </button>
+            ))}
+          </div>
+          <button onClick={() => router.push('/admin/clinic')}
+            className="rounded-xl border border-[#dfc8d4] bg-white px-4 py-2 text-[13px] font-semibold text-[#4a2435] hover:bg-[#fdf8fb]">
+            Clínica & Catálogo →
+          </button>
         </div>
 
         {/* ── LEADS TAB ── */}
