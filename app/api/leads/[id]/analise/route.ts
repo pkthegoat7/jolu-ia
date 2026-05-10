@@ -474,10 +474,16 @@ export async function POST(
     const filePath = `leads/${Date.now()}-${randomBytes(4).toString('hex')}.jpg`;
     const publicUrl = await uploadToSupabase(buffer, filePath, 'image/jpeg');
 
-    const resultado = await analisarImagem(buffer, landmarks);
+    const resultado = await analisarImagem(buffer, landmarks, lead.clinicId);
 
     const registro = await prisma.skinAnalysis.create({
-      data: { leadId, imageUrl: publicUrl, resultado },
+      data: {
+        leadId,
+        clinicId: lead.clinicId,
+        catalogSourceId: resultado.catalogSourceId ?? null,
+        imageUrl: publicUrl,
+        resultado,
+      },
     });
 
     const tokenInfo = await prisma.campaignToken.findUnique({ where: { id: lead.tokenId } });

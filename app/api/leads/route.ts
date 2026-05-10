@@ -51,7 +51,14 @@ export async function POST(request: Request) {
     }
 
     const lead = await prisma.lead.create({
-      data: { nome, email, telefone, desejaMelhorar, tokenId: token.id },
+      data: {
+        nome,
+        email,
+        telefone,
+        desejaMelhorar,
+        tokenId: token.id,
+        clinicId: token.clinicId,
+      },
     });
 
     return NextResponse.json(

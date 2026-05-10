@@ -5,9 +5,9 @@ import path from 'path';
 loadEnv({ path: path.resolve(process.cwd(), '.env.local'), override: true });
 loadEnv({ path: path.resolve(process.cwd(), '.env') });
 
-import { searchProducts, type SkinDiagnosis } from '../lib/pgvector';
+import { searchProducts, type SkinDiagnosis } from '../lib/catalog';
+import { prisma } from '../lib/prisma';
 
-// Cenarios de teste — perfis sinteticos para cada tipo de pele
 const CENARIOS: Array<{ nome: string; profile: SkinDiagnosis }> = [
   {
     nome: 'Pele Oleosa com acne',
@@ -47,21 +47,49 @@ function formatBRL(n: number): string {
 }
 
 async function main() {
-  // Sanity check de credenciais
-  const hasUrl = !!process.env.PGVECTOR_URL;
-  const hasFields =
-    !!(process.env.PGVECTOR_HOST && process.env.PGVECTOR_USER && process.env.PGVECTOR_PASSWORD);
-  if (!hasUrl && !hasFields) {
-    console.error('PGVECTOR_URL nao definida (nem os campos PGVECTOR_HOST/USER/PASSWORD).');
-    console.error('Configure no .env.local antes de rodar este teste.');
-    process.exit(1);
-  }
   if (!process.env.OPENAI_API_KEY) {
     console.error('OPENAI_API_KEY nao definida. Configure no .env.local.');
     process.exit(1);
   }
 
-  console.log('=== Teste de recomendacoes pgvector ===\n');
+  // Resolve a clinica via CLI arg, ou pega a primeira do banco
+  const clinicSlug = process.argv[2];
+  let clinicId: string;
+  let clinicName: string;
+
+  if (clinicSlug) {
+    const c = await prisma.clinic.findFirst({
+      where: { OR: [{ id: clinicSlug }, { name: { contains: clinicSlug, mode: 'insensitive' } }] },
+    });
+    if (!c) {
+      console.error(`Clinica nao encontrada: ${clinicSlug}`);
+      process.exit(1);
+    }
+    clinicId = c.id;
+    clinicName = c.name;
+  } else {
+    const c = await prisma.clinic.findFirst({ orderBy: { createdAt: 'asc' } });
+    if (!c) {
+      console.error('Nenhuma clinica encontrada no banco.');
+      process.exit(1);
+    }
+    clinicId = c.id;
+    clinicName = c.name;
+  }
+
+  // Sanity: ha uma CatalogSource ativa?
+  const source = await prisma.catalogSource.findFirst({
+    where: { clinicId, ativo: true },
+    orderBy: { prioridade: 'desc' },
+  });
+  if (!source) {
+    console.error(`Nenhuma CatalogSource ativa para clinica "${clinicName}" (${clinicId}).`);
+    process.exit(1);
+  }
+
+  console.log(`=== Teste de recomendacoes ===`);
+  console.log(`Clinica: ${clinicName} (${clinicId})`);
+  console.log(`Source : ${source.name} | type=${source.type} | envPrefix=${source.envPrefix}\n`);
 
   for (const c of CENARIOS) {
     console.log(`▶ ${c.nome}`);
@@ -69,16 +97,16 @@ async function main() {
     console.log(`  Obs: ${c.profile.observacoes}`);
 
     const t0 = Date.now();
-    const produtos = await searchProducts(c.profile, 5);
+    const { products, sourceId } = await searchProducts(c.profile, clinicId, 5);
     const ms = Date.now() - t0;
 
-    if (produtos.length === 0) {
+    if (products.length === 0) {
       console.log('  ✗ Nenhum produto retornado. Veja os logs acima para diagnostico.\n');
       continue;
     }
 
-    console.log(`  ✓ ${produtos.length} produtos em ${ms}ms:\n`);
-    produtos.forEach((p, i) => {
+    console.log(`  ✓ ${products.length} produtos em ${ms}ms (sourceId=${sourceId}):\n`);
+    products.forEach((p, i) => {
       const preco =
         p.precoPromocional && p.precoNormal && p.precoPromocional < p.precoNormal
           ? `${formatBRL(p.precoNormal)} → ${formatBRL(p.precoPromocional)}`
@@ -91,11 +119,11 @@ async function main() {
       console.log('');
     });
   }
-
-  process.exit(0);
 }
 
-main().catch((err) => {
-  console.error('Erro:', err);
-  process.exit(1);
-});
+main()
+  .catch((err) => {
+    console.error('Erro:', err);
+    process.exit(1);
+  })
+  .finally(() => prisma.$disconnect());

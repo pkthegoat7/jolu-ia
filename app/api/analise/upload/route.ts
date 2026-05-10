@@ -52,10 +52,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Token inválido.' }, { status: 401 });
     }
 
+    const dbUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { clinicId: true },
+    });
+    if (!dbUser?.clinicId) {
+      return NextResponse.json(
+        { message: 'Usuário não está vinculado a uma clínica.' },
+        { status: 400 },
+      );
+    }
+
     const filePath = `fotos/${randomUUID()}.jpg`;
     const publicUrl = await uploadToSupabase(buffer, filePath, 'image/jpeg');
 
-    const resultado = await analisarImagem(buffer, landmarks);
+    const resultado = await analisarImagem(buffer, landmarks, dbUser.clinicId);
 
     const analise = await prisma.analise.create({
       data: { userId, imageUrl: publicUrl, resultado },

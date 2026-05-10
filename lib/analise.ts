@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import sharp from 'sharp';
 import { createClient } from '@supabase/supabase-js';
-import { searchProducts, type SkinDiagnosis } from './pgvector';
+import { searchProducts, type SkinDiagnosis } from './catalog';
 
 type Landmark = { x: number; y: number; z: number };
 
@@ -23,6 +23,7 @@ export type ResultadoAnalise = {
   nivelSensibilidade: string;
   observacoes: string;
   recomendacoes: Recomendacao[];
+  catalogSourceId?: string | null;
   modoFallback?: boolean;
 };
 
@@ -198,31 +199,41 @@ function recomendacoesFallback(tipoPele: string) {
   return mapa[tipoPele] ?? mapa['Mista'];
 }
 
-async function recomendacoesPara(profile: SkinDiagnosis): Promise<Recomendacao[]> {
+async function recomendacoesPara(
+  profile: SkinDiagnosis,
+  clinicId: string,
+): Promise<{ items: Recomendacao[]; sourceId: string | null }> {
   try {
-    const produtos = await searchProducts(profile, 3);
-    if (produtos.length > 0) {
-      return produtos.map((p) => ({
-        nome: p.nome,
-        motivo: [p.tipo, p.categorias].filter(Boolean).join(' · '),
-        modoDeUso: 'Consulte as instruções de uso na embalagem do produto.',
-        link: p.link,
-        precoPromocional: p.precoPromocional,
-        precoNormal: p.precoNormal,
-        marca: p.marca,
-      }));
+    const { products, sourceId } = await searchProducts(profile, clinicId, 3);
+    if (products.length > 0) {
+      return {
+        sourceId,
+        items: products.map((p) => ({
+          nome: p.nome,
+          motivo: [p.tipo, p.categorias].filter(Boolean).join(' · '),
+          modoDeUso: 'Consulte as instruções de uso na embalagem do produto.',
+          link: p.link,
+          precoPromocional: p.precoPromocional,
+          precoNormal: p.precoNormal,
+          marca: p.marca,
+        })),
+      };
     }
   } catch (err) {
     console.error('[recomendacoes] busca vetorial falhou, usando fallback:', err instanceof Error ? err.message : err);
   }
-  return recomendacoesFallback(profile.tipoPele);
+  return { items: recomendacoesFallback(profile.tipoPele), sourceId: null };
 }
 
-async function fallbackPorBuffer(): Promise<ResultadoAnalise> {
+async function fallbackPorBuffer(clinicId: string): Promise<ResultadoAnalise> {
   const tipoPele = 'Mista';
   const nivelOleosidade = 'Media';
   const nivelAcne = 'Leve';
   const nivelSensibilidade = 'Media';
+  const recs = await recomendacoesPara(
+    { tipoPele, nivelOleosidade, nivelAcne, nivelSensibilidade, observacoes: '' },
+    clinicId,
+  );
   return {
     status: 'Concluido',
     tipoPele,
@@ -230,7 +241,8 @@ async function fallbackPorBuffer(): Promise<ResultadoAnalise> {
     nivelAcne,
     nivelSensibilidade,
     observacoes: 'Análise estimada — serviço de IA indisponível no momento.',
-    recomendacoes: await recomendacoesPara({ tipoPele, nivelOleosidade, nivelAcne, nivelSensibilidade, observacoes: '' }),
+    recomendacoes: recs.items,
+    catalogSourceId: recs.sourceId,
     modoFallback: true,
   };
 }
@@ -238,6 +250,7 @@ async function fallbackPorBuffer(): Promise<ResultadoAnalise> {
 export async function analisarImagem(
   imageBuffer: Buffer,
   landmarks: Landmark[] | null,
+  clinicId: string,
 ): Promise<ResultadoAnalise> {
   let faceBuffer = imageBuffer;
   if (landmarks) {
@@ -248,13 +261,17 @@ export async function analisarImagem(
 
   const parsed = await analisarComGemini(base64Image);
 
-  if (!parsed) return fallbackPorBuffer();
+  if (!parsed) return fallbackPorBuffer(clinicId);
 
   const tipoPele = parsed.tipoPele ?? 'Mista';
   const nivelOleosidade = parsed.nivelOleosidade ?? 'Media';
   const nivelAcne = parsed.nivelAcne ?? 'Leve';
   const nivelSensibilidade = parsed.nivelSensibilidade ?? 'Media';
   const observacoes = parsed.observacoes ?? '';
+  const recs = await recomendacoesPara(
+    { tipoPele, nivelOleosidade, nivelAcne, nivelSensibilidade, observacoes },
+    clinicId,
+  );
   return {
     status: 'Concluido',
     tipoPele,
@@ -262,13 +279,8 @@ export async function analisarImagem(
     nivelAcne,
     nivelSensibilidade,
     observacoes,
-    recomendacoes: await recomendacoesPara({
-      tipoPele,
-      nivelOleosidade,
-      nivelAcne,
-      nivelSensibilidade,
-      observacoes,
-    }),
+    recomendacoes: recs.items,
+    catalogSourceId: recs.sourceId,
   };
 }
 

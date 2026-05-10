@@ -17,7 +17,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!requireAdmin(request)) {
+  const adminUser = requireAdmin(request);
+  if (!adminUser) {
     return NextResponse.json({ message: 'Não autorizado.' }, { status: 401 });
   }
 
@@ -32,6 +33,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Nome da campanha muito longo.' }, { status: 400 });
     }
 
+    // JWT payload does not carry clinicId — look up admin to get it
+    const dbUser = await prisma.user.findUnique({
+      where: { id: String(adminUser.sub) },
+      select: { clinicId: true },
+    });
+    if (!dbUser?.clinicId) {
+      return NextResponse.json(
+        { message: 'Admin não está vinculado a uma clínica.' },
+        { status: 400 },
+      );
+    }
+
     const finalSlug = slug?.trim() || randomBytes(6).toString('hex');
 
     const slugRegex = /^[a-z0-9_-]+$/i;
@@ -43,7 +56,7 @@ export async function POST(request: Request) {
     }
 
     const token = await prisma.campaignToken.create({
-      data: { campanha, slug: finalSlug },
+      data: { campanha, slug: finalSlug, clinicId: dbUser.clinicId },
     });
 
     return NextResponse.json(token, { status: 201 });
