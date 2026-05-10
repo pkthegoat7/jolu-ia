@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 import sharp from 'sharp';
 import { createClient } from '@supabase/supabase-js';
 import { searchProducts, type SkinDiagnosis } from './catalog';
@@ -142,6 +143,56 @@ async function analisarComGemini(base64Image: string): Promise<Record<string, st
   }
 }
 
+async function analisarComGroq(base64Image: string): Promise<Record<string, string> | null> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    console.warn('[Groq] GROQ_API_KEY não definida — fallback indisponível');
+    return null;
+  }
+
+  try {
+    // Groq expõe API compatível com a OpenAI; reusa o SDK apontando pro endpoint dele.
+    const client = new OpenAI({
+      apiKey,
+      baseURL: 'https://api.groq.com/openai/v1',
+    });
+
+    const response = await client.chat.completions.create({
+      model: 'llama-3.2-11b-vision-preview',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: `${SKIN_ANALYSIS_SYSTEM}\n\nAnalise esta imagem facial e retorne o JSON de diagnóstico de pele.`,
+            },
+            {
+              type: 'image_url',
+              image_url: { url: `data:image/jpeg;base64,${base64Image}` },
+            },
+          ],
+        },
+      ],
+      max_tokens: 500,
+      temperature: 0.2,
+    });
+
+    const text = response.choices[0]?.message?.content ?? '';
+    console.log('[Groq] resposta bruta:', text.slice(0, 200));
+    const parsed = parseAnalysisJson(text);
+    if (parsed) {
+      console.log('[Groq] análise concluída:', JSON.stringify(parsed));
+    } else {
+      console.error('[Groq] falha ao parsear JSON da resposta');
+    }
+    return parsed;
+  } catch (err) {
+    console.error('[Groq] erro na análise:', err instanceof Error ? err.message : String(err));
+    return null;
+  }
+}
+
 function recomendacoesFallback(tipoPele: string) {
   const mapa: Record<string, { nome: string; motivo: string; modoDeUso: string }[]> = {
     Oleosa: [
@@ -259,7 +310,13 @@ export async function analisarImagem(
 
   const base64Image = faceBuffer.toString('base64');
 
-  const parsed = await analisarComGemini(base64Image);
+  // Cascata gratuita: tenta Gemini primeiro, cai pro Groq se falhar.
+  // Ambos no free tier — sem custo por análise.
+  let parsed = await analisarComGemini(base64Image);
+  if (!parsed) {
+    console.log('[analise] Gemini falhou, tentando fallback Groq');
+    parsed = await analisarComGroq(base64Image);
+  }
 
   if (!parsed) return fallbackPorBuffer(clinicId);
 
