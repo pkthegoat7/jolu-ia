@@ -1,12 +1,12 @@
-// Carrega .env.local primeiro (sobrescreve), depois .env. O Next.js faz isso
-// automaticamente em runtime, mas scripts standalone com tsx nao.
+// Carrega .env.local antes de qualquer import que dependa de DATABASE_URL.
+// lib/prisma.ts cria o cliente em module-load, entao precisa do env ja
+// populado quando importamos. Por isso usamos dynamic import abaixo.
 import { config as loadEnv } from 'dotenv';
 import path from 'path';
 loadEnv({ path: path.resolve(process.cwd(), '.env.local'), override: true });
-loadEnv({ path: path.resolve(process.cwd(), '.env') });
+loadEnv({ path: path.resolve(process.cwd(), '.env'), override: false });
 
-import { searchProducts, type SkinDiagnosis } from '../lib/catalog';
-import { prisma } from '../lib/prisma';
+import type { SkinDiagnosis } from '../lib/catalog';
 
 const CENARIOS: Array<{ nome: string; profile: SkinDiagnosis }> = [
   {
@@ -51,6 +51,15 @@ async function main() {
     console.error('OPENAI_API_KEY nao definida. Configure no .env.local.');
     process.exit(1);
   }
+  if (!process.env.DATABASE_URL) {
+    console.error('DATABASE_URL nao definida. Configure no .env.local.');
+    process.exit(1);
+  }
+
+  // Dynamic imports — garantem que dotenv ja carregou antes de criar
+  // o PrismaClient (que le DATABASE_URL no module-load do lib/prisma.ts)
+  const { searchProducts } = await import('../lib/catalog');
+  const { prisma } = await import('../lib/prisma');
 
   // Resolve a clinica via CLI arg, ou pega a primeira do banco
   const clinicSlug = process.argv[2];
@@ -126,4 +135,9 @@ main()
     console.error('Erro:', err);
     process.exit(1);
   })
-  .finally(() => prisma.$disconnect());
+  .finally(async () => {
+    try {
+      const { prisma } = await import('../lib/prisma');
+      await prisma.$disconnect();
+    } catch { /* prisma might not have been imported if env was missing */ }
+  });
