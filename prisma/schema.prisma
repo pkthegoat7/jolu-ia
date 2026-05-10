@@ -7,32 +7,66 @@ datasource db {
 }
 
 model User {
-  id            String     @id @default(uuid())
-  email         String     @unique
-  passwordHash  String
-  name          String
-  role          UserRole   @default(VIEWER)
-  birthDate     DateTime?
-  skinType      SkinType?
-  fitzpatrick   Int?
-  allergies     String[]
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         UserRole  @default(VIEWER)
+  birthDate    DateTime?
+  skinType     SkinType?
+  fitzpatrick  Int?
+  allergies    String[]
 
-  clinicId      String?
-  clinic        Clinic?    @relation(fields: [clinicId], references: [id], onDelete: SetNull)
+  clinicId String?
+  clinic   Clinic? @relation(fields: [clinicId], references: [id], onDelete: SetNull)
 
-  analyses      Analysis[]
-  analises      Analise[]
-  createdAt     DateTime   @default(now())
+  analyses  Analysis[]
+  analises  Analise[]
+  createdAt DateTime   @default(now())
 
   @@index([clinicId])
 }
 
 model Clinic {
-  id        String    @id @default(uuid())
-  name      String
-  users     User[]
-  products  Product[]
-  createdAt DateTime  @default(now())
+  id             String          @id @default(uuid())
+  name           String
+  // White-label (defaults garantem que linhas existentes não quebram)
+  brandName      String          @default("")
+  brandTagline   String          @default("")
+  logoUrl        String?
+  primaryColor   String          @default("#b96f8d")
+  senderEmail    String?
+  senderName     String?
+  users          User[]
+  products       Product[]
+  catalogSources CatalogSource[]
+  campaignTokens CampaignToken[]
+  leads          Lead[]
+  analyses       SkinAnalysis[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @default(now()) @updatedAt
+}
+
+enum CatalogType {
+  PGVECTOR
+  WOOCOMMERCE
+  MANUAL
+}
+
+model CatalogSource {
+  id         String         @id @default(uuid())
+  clinicId   String
+  clinic     Clinic         @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  type       CatalogType
+  name       String
+  envPrefix  String
+  ativo      Boolean        @default(true)
+  prioridade Int            @default(0)
+  analyses   SkinAnalysis[]
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @default(now()) @updatedAt
+
+  @@index([clinicId, ativo])
 }
 
 // Legacy model — kept for existing data. New analyses go through SkinAnalysis.
@@ -60,7 +94,7 @@ model Analise {
   resultado Json
   createdAt DateTime @default(now())
 
-  usuario   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  usuario User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([createdAt])
@@ -77,8 +111,8 @@ model Product {
   targetScores      Json
   contraindications String[]
 
-  clinicId          String
-  clinic            Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  clinicId String
+  clinic   Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
 
   @@index([clinicId])
 }
@@ -88,10 +122,13 @@ model CampaignToken {
   slug      String   @unique
   campanha  String
   ativo     Boolean  @default(true)
+  clinicId  String
+  clinic    Clinic   @relation(fields: [clinicId], references: [id], onDelete: Restrict)
   leads     Lead[]
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+  @@index([clinicId])
 }
 
 model Lead {
@@ -101,11 +138,14 @@ model Lead {
   telefone       String
   desejaMelhorar String
   tokenId        String
+  clinicId       String
   token          CampaignToken @relation(fields: [tokenId], references: [id], onDelete: Restrict)
+  clinic         Clinic        @relation(fields: [clinicId], references: [id], onDelete: Restrict)
   analise        SkinAnalysis?
   createdAt      DateTime      @default(now())
 
   @@index([tokenId])
+  @@index([clinicId])
   @@index([createdAt])
 }
 
@@ -116,15 +156,21 @@ model Settings {
 }
 
 model SkinAnalysis {
-  id           String   @id @default(uuid())
-  leadId       String   @unique
-  lead         Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  imageUrl     String
-  resultado    Json
-  emailEnviado Boolean  @default(false)
-  createdAt    DateTime @default(now())
+  id              String         @id @default(uuid())
+  leadId          String         @unique
+  clinicId        String
+  catalogSourceId String?
+  lead            Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  clinic          Clinic         @relation(fields: [clinicId], references: [id], onDelete: Restrict)
+  catalogSource   CatalogSource? @relation(fields: [catalogSourceId], references: [id], onDelete: SetNull)
+  imageUrl        String
+  resultado       Json
+  emailEnviado    Boolean        @default(false)
+  createdAt       DateTime       @default(now())
 
   @@index([leadId])
+  @@index([clinicId])
+  @@index([catalogSourceId])
   @@index([emailEnviado])
   @@index([createdAt])
 }
