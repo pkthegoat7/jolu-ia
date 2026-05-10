@@ -121,7 +121,7 @@ async function analisarComGemini(base64Image: string): Promise<Record<string, st
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const result = await model.generateContent([
       { text: SKIN_ANALYSIS_SYSTEM + '\n\nAnalise esta imagem facial e retorne o JSON de diagnóstico de pele.' },
@@ -158,7 +158,7 @@ async function analisarComGroq(base64Image: string): Promise<Record<string, stri
     });
 
     const response = await client.chat.completions.create({
-      model: 'llama-3.2-11b-vision-preview',
+      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
       messages: [
         {
           role: 'user',
