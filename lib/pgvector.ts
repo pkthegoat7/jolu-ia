@@ -1,19 +1,51 @@
-import { Pool } from 'pg';
+import { Pool, type PoolConfig } from 'pg';
 import OpenAI from 'openai';
 
 let pool: Pool | null = null;
 let openai: OpenAI | null = null;
 
+const DEFAULT_TABLE = 'n8n_vectors_produtos_ecommerce';
+// Identifier safety: only [A-Za-z0-9_], must start with letter/underscore.
+// Prevents SQL injection via env var since table names can't be parameterized.
+const SAFE_IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+function buildPoolConfig(): PoolConfig | null {
+  const common = { max: 5, idleTimeoutMillis: 10_000, connectionTimeoutMillis: 5_000 };
+
+  if (process.env.PGVECTOR_URL) {
+    return { ...common, connectionString: process.env.PGVECTOR_URL };
+  }
+
+  const { PGVECTOR_HOST, PGVECTOR_PORT, PGVECTOR_DB, PGVECTOR_USER, PGVECTOR_PASSWORD } = process.env;
+  if (PGVECTOR_HOST && PGVECTOR_PORT && PGVECTOR_DB && PGVECTOR_USER && PGVECTOR_PASSWORD) {
+    return {
+      ...common,
+      host: PGVECTOR_HOST,
+      port: Number(PGVECTOR_PORT),
+      database: PGVECTOR_DB,
+      user: PGVECTOR_USER,
+      password: PGVECTOR_PASSWORD,
+    };
+  }
+
+  return null;
+}
+
 function getPool(): Pool | null {
   if (pool) return pool;
-  if (!process.env.PGVECTOR_URL) return null;
-  pool = new Pool({
-    connectionString: process.env.PGVECTOR_URL,
-    max: 5,
-    idleTimeoutMillis: 10_000,
-    connectionTimeoutMillis: 5_000,
-  });
+  const cfg = buildPoolConfig();
+  if (!cfg) return null;
+  pool = new Pool(cfg);
   return pool;
+}
+
+function getTableName(): string {
+  const t = process.env.PGVECTOR_TABLE ?? DEFAULT_TABLE;
+  if (!SAFE_IDENT.test(t)) {
+    console.warn(`[pgvector] PGVECTOR_TABLE inválido (${t}); usando default`);
+    return DEFAULT_TABLE;
+  }
+  return t;
 }
 
 function getOpenAI(): OpenAI | null {
@@ -80,6 +112,7 @@ export async function searchProducts(
   if (!embedding) return [];
 
   const vectorLiteral = `[${embedding.join(',')}]`;
+  const table = getTableName();
 
   const { rows } = await p.query(
     `SELECT
@@ -92,7 +125,7 @@ export async function searchProducts(
        (metadata->>'preco_normal')::numeric AS preco_normal,
        metadata->>'link_produto' AS link,
        1 - (embedding <=> $1::vector) AS similarity
-     FROM n8n_vectors_produtos_ecommerce
+     FROM "${table}"
      WHERE metadata->>'situacao' = 'Ativo'
      ORDER BY embedding <=> $1::vector ASC
      LIMIT $2`,
