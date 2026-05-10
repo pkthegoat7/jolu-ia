@@ -1,8 +1,19 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import sharp from 'sharp';
 import { createClient } from '@supabase/supabase-js';
+import { searchProducts, type SkinDiagnosis } from './pgvector';
 
 type Landmark = { x: number; y: number; z: number };
+
+export type Recomendacao = {
+  nome: string;
+  motivo: string;
+  modoDeUso: string;
+  link?: string;
+  precoPromocional?: number;
+  precoNormal?: number;
+  marca?: string;
+};
 
 export type ResultadoAnalise = {
   status: string;
@@ -11,7 +22,7 @@ export type ResultadoAnalise = {
   nivelAcne: string;
   nivelSensibilidade: string;
   observacoes: string;
-  recomendacoes: { nome: string; motivo: string; modoDeUso: string }[];
+  recomendacoes: Recomendacao[];
   modoFallback?: boolean;
 };
 
@@ -130,7 +141,7 @@ async function analisarComGemini(base64Image: string): Promise<Record<string, st
   }
 }
 
-function recomendacoesPara(tipoPele: string) {
+function recomendacoesFallback(tipoPele: string) {
   const mapa: Record<string, { nome: string; motivo: string; modoDeUso: string }[]> = {
     Oleosa: [
       {
@@ -187,16 +198,39 @@ function recomendacoesPara(tipoPele: string) {
   return mapa[tipoPele] ?? mapa['Mista'];
 }
 
-function fallbackPorBuffer(): ResultadoAnalise {
+async function recomendacoesPara(profile: SkinDiagnosis): Promise<Recomendacao[]> {
+  try {
+    const produtos = await searchProducts(profile, 3);
+    if (produtos.length > 0) {
+      return produtos.map((p) => ({
+        nome: p.nome,
+        motivo: [p.tipo, p.categorias].filter(Boolean).join(' · '),
+        modoDeUso: 'Consulte as instruções de uso na embalagem do produto.',
+        link: p.link,
+        precoPromocional: p.precoPromocional,
+        precoNormal: p.precoNormal,
+        marca: p.marca,
+      }));
+    }
+  } catch (err) {
+    console.error('[recomendacoes] busca vetorial falhou, usando fallback:', err instanceof Error ? err.message : err);
+  }
+  return recomendacoesFallback(profile.tipoPele);
+}
+
+async function fallbackPorBuffer(): Promise<ResultadoAnalise> {
   const tipoPele = 'Mista';
+  const nivelOleosidade = 'Media';
+  const nivelAcne = 'Leve';
+  const nivelSensibilidade = 'Media';
   return {
     status: 'Concluido',
     tipoPele,
-    nivelOleosidade: 'Media',
-    nivelAcne: 'Leve',
-    nivelSensibilidade: 'Media',
+    nivelOleosidade,
+    nivelAcne,
+    nivelSensibilidade,
     observacoes: 'Análise estimada — serviço de IA indisponível no momento.',
-    recomendacoes: recomendacoesPara(tipoPele),
+    recomendacoes: await recomendacoesPara({ tipoPele, nivelOleosidade, nivelAcne, nivelSensibilidade, observacoes: '' }),
     modoFallback: true,
   };
 }
@@ -217,14 +251,24 @@ export async function analisarImagem(
   if (!parsed) return fallbackPorBuffer();
 
   const tipoPele = parsed.tipoPele ?? 'Mista';
+  const nivelOleosidade = parsed.nivelOleosidade ?? 'Media';
+  const nivelAcne = parsed.nivelAcne ?? 'Leve';
+  const nivelSensibilidade = parsed.nivelSensibilidade ?? 'Media';
+  const observacoes = parsed.observacoes ?? '';
   return {
     status: 'Concluido',
     tipoPele,
-    nivelOleosidade: parsed.nivelOleosidade ?? 'Media',
-    nivelAcne: parsed.nivelAcne ?? 'Leve',
-    nivelSensibilidade: parsed.nivelSensibilidade ?? 'Media',
-    observacoes: parsed.observacoes ?? '',
-    recomendacoes: recomendacoesPara(tipoPele),
+    nivelOleosidade,
+    nivelAcne,
+    nivelSensibilidade,
+    observacoes,
+    recomendacoes: await recomendacoesPara({
+      tipoPele,
+      nivelOleosidade,
+      nivelAcne,
+      nivelSensibilidade,
+      observacoes,
+    }),
   };
 }
 

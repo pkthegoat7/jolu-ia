@@ -74,6 +74,25 @@ async function enviarEmailProtocolo(
     return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#e8f5e9;color:#1b5e20;">${escapeHtml(nivel)}</span>`;
   }
 
+  const fmtBRL = (n: number) =>
+    n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  function precoBloco(p: { precoPromocional?: number; precoNormal?: number }): string {
+    if (p.precoPromocional && p.precoNormal && p.precoPromocional < p.precoNormal) {
+      return `<p style="margin:8px 0 0;font-size:14px;color:#4a2435;"><span style="text-decoration:line-through;color:#b8a0ac;">${fmtBRL(p.precoNormal)}</span> <strong style="color:#7a3f56;">${fmtBRL(p.precoPromocional)}</strong></p>`;
+    }
+    if (p.precoPromocional || p.precoNormal) {
+      return `<p style="margin:8px 0 0;font-size:14px;color:#4a2435;"><strong>${fmtBRL((p.precoPromocional ?? p.precoNormal)!)}</strong></p>`;
+    }
+    return '';
+  }
+
+  function linkBloco(link?: string): string {
+    if (!link) return '';
+    // escapeHtml protege o atributo href de injeção (aspas/ângulos)
+    return `<p style="margin:10px 0 0;"><a href="${escapeHtml(link)}" style="display:inline-block;padding:8px 16px;background:#b96f8d;color:#fff;text-decoration:none;font-size:13px;font-weight:600;border-radius:8px;">Ver produto →</a></p>`;
+  }
+
   const produtosHtml = resultado.recomendacoes
     .map(
       (p, i) => `
@@ -84,10 +103,12 @@ async function enviarEmailProtocolo(
           </td>
           <td valign="top" style="padding:16px 16px 16px 12px;">
             <p style="margin:0 0 4px;font-size:14px;font-weight:700;color:#4a2435;">${escapeHtml(p.nome)}</p>
-            <p style="margin:0 0 8px;font-size:13px;color:#7a5060;line-height:1.5;">${escapeHtml(p.motivo)}</p>
+            ${p.motivo ? `<p style="margin:0 0 8px;font-size:13px;color:#7a5060;line-height:1.5;">${escapeHtml(p.motivo)}</p>` : ''}
             <p style="margin:0;font-size:12px;color:#b96f8d;background:#fdf8fb;border-radius:6px;padding:6px 10px;display:inline-block;">
               <strong style="color:#4a2435;">Como usar:</strong> ${escapeHtml(p.modoDeUso)}
             </p>
+            ${precoBloco(p)}
+            ${linkBloco(p.link)}
           </td>
         </tr>
       </table>`,
