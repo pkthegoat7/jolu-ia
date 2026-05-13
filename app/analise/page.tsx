@@ -335,8 +335,18 @@ function AnalisePage() {
   }, [startMesh, captureBlurFrame]);
 
   const enviarAnalise = async (frame: Blob) => {
+    if (!analysisToken || !leadId) {
+      console.error('[analise] missing analysisToken/leadId', { hasToken: !!analysisToken, hasLeadId: !!leadId });
+      setScanStatus('Erro de sessão. Recarregue a página.');
+      capturedRef.current = false;
+      okFramesRef.current = 0;
+      scanRunningRef.current = true;
+      return;
+    }
+
     setStep('processing');
     stopMesh();
+    setScanStatus('');
 
     const fd = new FormData();
     fd.append('image', frame, 'scan.jpg');
@@ -344,26 +354,41 @@ function AnalisePage() {
     const lm = getLandmarks();
     if (lm) fd.append('landmarks', JSON.stringify(lm));
 
+    // Timeout de 60s — backend tem maxDuration de 60s e Gemini pode demorar.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60_000);
+
     try {
-      const res = await fetch(apiUrl(`/leads/${leadId}/analise`), { method: 'POST', body: fd });
+      const res = await fetch(apiUrl(`/leads/${leadId}/analise`), {
+        method: 'POST',
+        body: fd,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
       if (res.ok) {
         router.push('/obrigado');
-      } else {
-        const data = await res.json().catch(() => ({}));
-        setStep('scan');
-        setScanStatus(data?.message ?? 'Erro na análise. Tente novamente.');
-        capturedRef.current = false;
-        okFramesRef.current = 0;
-        scanRunningRef.current = true;
-        startMesh();
+        return;
       }
-    } catch {
+      const data = await res.json().catch(() => ({}));
+      console.error('[analise] falhou:', res.status, data);
       setStep('scan');
-      setScanStatus('Erro ao conectar. Tente novamente.');
+      setGuidance({ message: 'Posicione seu rosto na câmera', status: 'waiting', arrow: null });
+      setScanStatus(`Erro (${res.status}): ${data?.message ?? 'Tente novamente.'}`);
       capturedRef.current = false;
       okFramesRef.current = 0;
       scanRunningRef.current = true;
-      startMesh();
+      void startMesh();
+    } catch (err) {
+      clearTimeout(timeoutId);
+      const isAbort = (err as Error)?.name === 'AbortError';
+      console.error('[analise] falha de rede:', err);
+      setStep('scan');
+      setGuidance({ message: 'Posicione seu rosto na câmera', status: 'waiting', arrow: null });
+      setScanStatus(isAbort ? 'Erro: análise demorou demais. Tente novamente.' : 'Erro ao conectar. Verifique sua internet.');
+      capturedRef.current = false;
+      okFramesRef.current = 0;
+      scanRunningRef.current = true;
+      void startMesh();
     }
   };
   enviarAnaliseRef.current = (b: Blob) => { void enviarAnalise(b); };
@@ -578,9 +603,9 @@ function AnalisePage() {
           </div>
         )}
 
-        {scanStatus && !meshReady && (
-          <p className={`fu3 w-full flex items-center gap-2 text-[13px] font-medium ${scanStatus.includes('Erro') ? 'text-red-500' : 'text-[#8a6070]'}`}>
-            <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${scanStatus.includes('Erro') ? 'bg-red-400' : 'bg-[#b96f8d] animate-pulse'}`} />
+        {scanStatus && (
+          <p className={`fu3 w-full flex items-center gap-2 text-[13px] font-medium ${scanStatus.includes('Erro') || scanStatus.includes('Falha') ? 'text-red-500' : 'text-[#8a6070]'}`}>
+            <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${scanStatus.includes('Erro') || scanStatus.includes('Falha') ? 'bg-red-400' : 'bg-[#b96f8d] animate-pulse'}`} />
             {scanStatus}
           </p>
         )}
