@@ -619,17 +619,22 @@ function AnalisePage() {
           style={{ background: 'linear-gradient(145deg,#020A1A 0%,#072C57 50%,#0B3868 100%)' }}>
           <div className="p-4">
             <div className="relative overflow-hidden rounded-xl" style={{ aspectRatio: '4/3' }}>
-              {/* Base video — used for face detection, covered by blur snapshot */}
-              <video ref={videoRef} autoPlay muted playsInline className="h-full w-full object-cover" />
+              {/* Base video — used for face detection, covered by blur snapshot.
+                  scaleX(-1) espelha pra feel natural de selfie; mediapipe roda no source raw
+                  entao yaw/pitch ainda batem (movimento real = movimento esperado em modo espelho). */}
+              <video ref={videoRef} autoPlay muted playsInline
+                className="h-full w-full object-cover"
+                style={{ transform: 'scaleX(-1)' }} />
               {/* Static blurred snapshot — updated every 4s, zero ongoing GPU cost */}
               {blurBg && (
                 <img src={blurBg} alt="" aria-hidden
-                  className="absolute inset-0 h-full w-full object-cover pointer-events-none brightness-50" />
+                  className="absolute inset-0 h-full w-full object-cover pointer-events-none brightness-50"
+                  style={{ transform: 'scaleX(-1)' }} />
               )}
               {/* Sharp live video clipped to oval */}
               <video ref={sharpVideoRef} autoPlay muted playsInline
                 className="absolute inset-0 h-full w-full object-cover pointer-events-none"
-                style={{ clipPath: 'ellipse(24% 42.7% at 50% 49.3%)' }} />
+                style={{ clipPath: 'ellipse(24% 42.7% at 50% 49.3%)', transform: 'scaleX(-1)' }} />
               <canvas ref={canvasRef} className="absolute inset-0 h-full w-full pointer-events-none" />
               <CornerBrackets lit={guidance.status === 'ok'} />
               <GuidanceOverlay guidance={guidance} camOn={camOn} />

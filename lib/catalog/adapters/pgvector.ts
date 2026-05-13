@@ -99,6 +99,7 @@ async function queryByEmbedding(
   const vectorLiteral = `[${embedding.join(',')}]`;
   const table = getTableName(envPrefix);
 
+  // Exclui kits/combos/conjuntos — protocolo recomenda sempre produtos individuais.
   const { rows } = await p.query(
     `SELECT
        id,
@@ -112,6 +113,9 @@ async function queryByEmbedding(
        1 - (embedding <=> $1::vector) AS similarity
      FROM "${table}"
      WHERE metadata->>'situacao' = 'Ativo'
+       AND coalesce(metadata->>'nome_produto', '') !~* '\y(kit|combo|conjunto|bundle|presente)\y'
+       AND coalesce(metadata->>'tipo_produto', '') !~* '\y(kit|combo|conjunto|bundle)\y'
+       AND coalesce(metadata->>'categorias',  '') !~* '\y(kit|combo|conjunto|bundle)\y'
      ORDER BY embedding <=> $1::vector ASC
      LIMIT $2`,
     [vectorLiteral, limit],
