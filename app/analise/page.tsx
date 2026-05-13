@@ -35,11 +35,15 @@ function computePose(lm: Landmark[] | null): Pose | null {
 
 // Posicionamento básico (face centralizada, frontal, distância OK).
 function checkFraming(p: Pose): Guidance | null {
-  if (p.faceHeight < 0.22) return { message: 'Aproxime o rosto da câmera', status: 'warn', arrow: 'in' };
-  if (p.faceHeight > 0.72) return { message: 'Afaste o rosto da câmera',   status: 'warn', arrow: 'out' };
-  if (Math.abs(p.roll) > 14) return { message: 'Endireite levemente a cabeça', status: 'warn', arrow: null };
-  if (Math.abs(p.yaw)  > 0.14) return { message: 'Olhe direto para a câmera', status: 'warn', arrow: null };
-  if (Math.abs(p.pitch) > 0.10) return { message: 'Olhe direto para a câmera', status: 'warn', arrow: null };
+  if (p.faceHeight < 0.18) return { message: 'Aproxime o rosto da câmera', status: 'warn', arrow: 'in' };
+  if (p.faceHeight > 0.85) return { message: 'Afaste o rosto da câmera',   status: 'warn', arrow: 'out' };
+  if (Math.abs(p.roll) > 18) return { message: 'Endireite levemente a cabeça', status: 'warn', arrow: null };
+  // Yaw: nariz à direita do eixo (yaw < 0) = face virada para a direita do usuário.
+  if (p.yaw < -0.28) return { message: 'Vire um pouco para a esquerda', status: 'warn', arrow: 'left' };
+  if (p.yaw >  0.28) return { message: 'Vire um pouco para a direita', status: 'warn', arrow: 'right' };
+  // Pitch: nariz abaixo da linha dos olhos (pitch > 0) = olhando para baixo.
+  if (p.pitch >  0.20) return { message: 'Levante levemente o queixo',  status: 'warn', arrow: 'up'   };
+  if (p.pitch < -0.20) return { message: 'Abaixe levemente o queixo',   status: 'warn', arrow: 'down' };
   return null;
 }
 
@@ -236,11 +240,10 @@ function AnalisePage() {
     }
 
     okFramesRef.current += 1;
-    // Precisa segurar a pose ~15 frames (~1s a 15fps) para considerar estável.
-    const FRAMES_NEEDED = 15;
-    const remaining = Math.max(0, FRAMES_NEEDED - okFramesRef.current);
+    // Precisa segurar a pose ~22 frames (~1.5s a 15fps) para considerar estável.
+    const FRAMES_NEEDED = 22;
     setGuidance({
-      message: remaining > 0 ? `Segure assim... capturando em ${Math.ceil(remaining / 15)}s` : 'Capturando',
+      message: okFramesRef.current < FRAMES_NEEDED ? 'Segure assim...' : 'Capturando',
       status: 'ok',
       arrow: null,
     });
