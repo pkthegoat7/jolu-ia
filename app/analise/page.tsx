@@ -106,7 +106,7 @@ function GuidanceOverlay({ guidance, camOn }: { guidance: Guidance; camOn: boole
 
 // ── Corner Brackets ──────────────────────────────────────────────────
 function CornerBrackets({ lit }: { lit: boolean }) {
-  const c = lit ? 'border-[#c07898]/90' : 'border-white/18';
+  const c = lit ? 'border-[#3D6BA3]/90' : 'border-white/18';
   const s = `absolute w-5 h-5 transition-all duration-700 ${c}`;
   return (
     <>
@@ -116,6 +116,26 @@ function CornerBrackets({ lit }: { lit: boolean }) {
       <div className={`${s} bottom-3 right-3 border-b-[1.5px] border-r-[1.5px]`} />
     </>
   );
+}
+
+// Mascara progressiva BR: (XX) XXXX-XXXX (fixo) ou (XX) XXXXX-XXXX (celular).
+function formatPhoneBR(value: string): string {
+  const d = value.replace(/\D/g, '').slice(0, 11);
+  if (d.length === 0) return '';
+  if (d.length <= 2) return `(${d}`;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
+
+// Telefone valido: DDD 11-99, celular (11 digitos) com 9 no 3o digito, fixo (10 digitos).
+function isValidPhoneBR(value: string): boolean {
+  const d = value.replace(/\D/g, '');
+  if (d.length !== 10 && d.length !== 11) return false;
+  const ddd = parseInt(d.slice(0, 2), 10);
+  if (ddd < 11 || ddd > 99) return false;
+  if (d.length === 11 && d[2] !== '9') return false;
+  return true;
 }
 
 // Opções de desejos: usado tanto no form quanto no backend p/ enriquecer a busca de produtos.
@@ -138,21 +158,25 @@ const Ic = {
   Sparkle: () => <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>,
 };
 
-function Field({ id, label, type, ph, val, set, Icon, textarea }: {
+function Field({ id, label, type, ph, val, set, Icon, textarea, invalid, maxLength }: {
   id: string; label: string; type: string; ph: string;
-  val: string; set: (v: string) => void; Icon: () => React.ReactNode; textarea?: boolean;
+  val: string; set: (v: string) => void; Icon: () => React.ReactNode;
+  textarea?: boolean; invalid?: boolean; maxLength?: number;
 }) {
   return (
     <div>
-      <label htmlFor={id} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8b3f5a]">{label}</label>
+      <label htmlFor={id} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0C417D]">{label}</label>
       <div className="relative">
-        <span className="pointer-events-none absolute left-3.5 top-3.5 text-[#c4a0b8]"><Icon /></span>
+        <span className="pointer-events-none absolute left-3.5 top-3.5 text-[#8AA2C2]"><Icon /></span>
         {textarea ? (
           <textarea id={id} placeholder={ph} value={val} required rows={3}
-            className="field resize-none pt-3 pb-3" onChange={e => set(e.target.value)} />
+            className={`field resize-none pt-3 pb-3 ${invalid ? 'field-error' : ''}`}
+            onChange={e => set(e.target.value)} />
         ) : (
           <input id={id} type={type} placeholder={ph} value={val} required
-            className="field" onChange={e => set(e.target.value)} />
+            maxLength={maxLength}
+            className={`field ${invalid ? 'field-error' : ''}`}
+            onChange={e => set(e.target.value)} />
         )}
       </div>
     </div>
@@ -304,6 +328,10 @@ function AnalisePage() {
         : 'Preencha todos os campos.');
       return;
     }
+    if (!isValidPhoneBR(telefone)) {
+      setError('Telefone inválido. Use o formato (XX) 9XXXX-XXXX.');
+      return;
+    }
     setFormBusy(true);
     try {
       const res = await fetch(apiUrl('/leads'), {
@@ -422,10 +450,10 @@ function AnalisePage() {
   // ── Render: validating ────────────────────────────────────────────
   if (step === 'validating') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f7f0f3]">
+      <div className="flex min-h-screen items-center justify-center bg-[#F2F5FA]">
         <div className="flex flex-col items-center gap-4">
-          <div className="h-8 w-8 rounded-full border-2 border-[#b96f8d]/30 border-t-[#b96f8d] animate-spin" />
-          <p className="text-sm text-[#9a7282]">Verificando link...</p>
+          <div className="h-8 w-8 rounded-full border-2 border-[#0C417D]/30 border-t-[#0C417D] animate-spin" />
+          <p className="text-sm text-[#5A7299]">Verificando link...</p>
         </div>
       </div>
     );
@@ -434,7 +462,7 @@ function AnalisePage() {
   // ── Render: invalid link ──────────────────────────────────────────
   if (step === 'invalid') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f7f0f3] p-6">
+      <div className="flex min-h-screen items-center justify-center bg-[#F2F5FA] p-6">
         <div className="glass rounded-3xl p-12 text-center max-w-sm w-full">
           <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl"
             style={{ background: 'linear-gradient(135deg,rgba(220,80,80,.10),rgba(180,60,60,.16))', border: '1px solid rgba(220,80,80,.25)' }}>
@@ -442,8 +470,8 @@ function AnalisePage() {
               <circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/>
             </svg>
           </div>
-          <p className="font-display text-2xl font-light text-[#4a2435] mb-2">Link inválido</p>
-          <p className="text-sm text-[#9a7282] leading-relaxed">
+          <p className="font-display text-2xl font-light text-[#072C57] mb-2">Link inválido</p>
+          <p className="text-sm text-[#5A7299] leading-relaxed">
             Este link de análise não é válido ou já expirou. Solicite um novo link.
           </p>
         </div>
@@ -454,37 +482,39 @@ function AnalisePage() {
   // ── Render: form ─────────────────────────────────────────────────
   if (step === 'form') {
     return (
-      <div className="min-h-screen bg-[#f7f0f3] flex flex-col items-center justify-center px-5 py-12">
+      <div className="min-h-screen bg-[#F2F5FA] flex flex-col items-center justify-center px-5 py-12">
         <div className="w-full max-w-md space-y-6">
 
           {/* Brand */}
           <div className="text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-[#dfc8d4] bg-white shadow-sm">
-              <span className="font-display text-sm font-semibold tracking-widest text-[#4a2435]">PE</span>
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-[#C4D2E4] bg-white shadow-sm">
+              <span className="font-display text-sm font-semibold tracking-widest text-[#072C57]">PE</span>
             </div>
-            <p className="text-[9px] font-medium uppercase tracking-[0.38em] text-[#b96f8d]">Patrícia Elias</p>
-            <h1 className="mt-1 font-display text-[2.2rem] font-light text-[#4a2435] leading-tight">
-              Análise <span style={{ fontStyle: 'italic', color: '#7a3f56' }}>gratuita</span> de pele
+            <p className="text-[9px] font-medium uppercase tracking-[0.38em] text-[#0C417D]">Patrícia Elias</p>
+            <h1 className="mt-1 font-display text-[2.2rem] font-light text-[#072C57] leading-tight">
+              Análise <span style={{ fontStyle: 'italic', color: '#0C417D' }}>gratuita</span> de pele
             </h1>
             {campanha && (
-              <p className="mt-1 text-[11px] text-[#b8a0ac] uppercase tracking-widest">{campanha}</p>
+              <p className="mt-1 text-[11px] text-[#8AA2C2] uppercase tracking-widest">{campanha}</p>
             )}
-            <p className="mt-2 text-sm text-[#9a7282]">
+            <p className="mt-2 text-sm text-[#5A7299]">
               Preencha seus dados para receber seu protocolo personalizado por e-mail.
             </p>
           </div>
 
           {/* Form card */}
-          <div className="glass rounded-3xl p-8" style={{ boxShadow: '0 8px 48px rgba(107,45,69,.12),inset 0 1px 0 rgba(255,255,255,.95)' }}>
+          <div className="glass rounded-3xl p-8" style={{ boxShadow: '0 8px 48px rgba(7,44,87,.14),inset 0 1px 0 rgba(255,255,255,.95)' }}>
             <form onSubmit={submitForm} className="space-y-4">
               <Field id="nome" label="Nome completo" type="text" ph="Maria Silva" val={nome} set={setNome} Icon={Ic.User} />
               <Field id="email" label="E-mail" type="email" ph="seu@email.com" val={email} set={setEmail} Icon={Ic.Mail} />
-              <Field id="tel" label="Telefone / WhatsApp" type="tel" ph="(11) 99999-9999" val={telefone} set={setTelefone} Icon={Ic.Phone} />
+              <Field id="tel" label="Telefone / WhatsApp" type="tel" ph="(11) 99999-9999"
+                val={telefone} set={(v) => setTelefone(formatPhoneBR(v))} Icon={Ic.Phone}
+                invalid={telefone.length > 0 && !isValidPhoneBR(telefone)} maxLength={15} />
               <div>
-                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8b3f5a]">
+                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0C417D]">
                   O que deseja melhorar na sua pele?
                 </label>
-                <p className="mb-2 text-[11px] text-[#b8a0ac]">Selecione um ou mais objetivos</p>
+                <p className="mb-2 text-[11px] text-[#8AA2C2]">Selecione um ou mais objetivos</p>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {DESEJOS_OPCOES.map((opt) => {
                     const checked = desejos.includes(opt);
@@ -492,14 +522,14 @@ function AnalisePage() {
                       <label key={opt}
                         className={`flex cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-2.5 text-[12px] leading-tight transition-all ${
                           checked
-                            ? 'border-[#b96f8d] bg-[#fdf4f8] text-[#4a2435]'
-                            : 'border-[#e8d0db] bg-white text-[#7a4f60] hover:border-[#dfc8d4]'
+                            ? 'border-[#0C417D] bg-[#E0E8F2] text-[#072C57]'
+                            : 'border-[#DDE5F0] bg-white text-[#3D6BA3] hover:border-[#C4D2E4]'
                         }`}>
                         <input type="checkbox" checked={checked}
                           onChange={() => setDesejos((prev) =>
                             prev.includes(opt) ? prev.filter((x) => x !== opt) : [...prev, opt]
                           )}
-                          className="h-3.5 w-3.5 flex-shrink-0 accent-[#b96f8d]" />
+                          className="h-3.5 w-3.5 flex-shrink-0 accent-[#0C417D]" />
                         <span>{opt}</span>
                       </label>
                     );
@@ -521,7 +551,7 @@ function AnalisePage() {
                   : 'Iniciar minha análise →'}
               </button>
             </form>
-            <p className="mt-4 text-center text-[11px] text-[#c0a8b4] leading-relaxed">
+            <p className="mt-4 text-center text-[11px] text-[#7A91B0] leading-relaxed">
               Seus dados são protegidos e usados apenas para envio do protocolo.
             </p>
           </div>
@@ -533,22 +563,22 @@ function AnalisePage() {
   // ── Render: processing overlay ────────────────────────────────────
   if (step === 'processing') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f7f0f3]">
+      <div className="flex min-h-screen items-center justify-center bg-[#F2F5FA]">
         <div className="flex flex-col items-center gap-5 text-center px-6">
           <div className="relative h-20 w-20">
             <svg className="-rotate-90 h-full w-full" viewBox="0 0 84 84">
               <circle cx="42" cy="42" r="38" fill="none" stroke="rgba(192,120,152,.15)" strokeWidth="4" />
-              <circle cx="42" cy="42" r="38" fill="none" stroke="#c07898" strokeWidth="4"
+              <circle cx="42" cy="42" r="38" fill="none" stroke="#3D6BA3" strokeWidth="4"
                 strokeLinecap="round" strokeDasharray="50 189"
                 style={{ animation: 'spin 1.1s linear infinite' }} />
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="h-3 w-3 rounded-full bg-[#c07898] animate-pulse" />
+              <div className="h-3 w-3 rounded-full bg-[#3D6BA3] animate-pulse" />
             </div>
           </div>
           <div>
-            <p className="font-display text-2xl font-light text-[#4a2435]">Analisando sua pele</p>
-            <p className="mt-1 text-sm text-[#9a7282]">Inteligência artificial processando sua imagem...</p>
+            <p className="font-display text-2xl font-light text-[#072C57]">Analisando sua pele</p>
+            <p className="mt-1 text-sm text-[#5A7299]">Inteligência artificial processando sua imagem...</p>
           </div>
         </div>
       </div>
@@ -557,36 +587,36 @@ function AnalisePage() {
 
   // ── Render: scan ─────────────────────────────────────────────────
   return (
-    <div className="min-h-screen flex flex-col bg-[#f7f0f3]">
-      <header className="flex items-center justify-between px-6 py-4 border-b border-[#e8d0db]/60 bg-white/60 backdrop-blur-md sticky top-0 z-20">
+    <div className="min-h-screen flex flex-col bg-[#F2F5FA]">
+      <header className="flex items-center justify-between px-6 py-4 border-b border-[#DDE5F0]/60 bg-white/60 backdrop-blur-md sticky top-0 z-20">
         <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#dfc8d4] bg-white shadow-sm">
-            <span className="font-display text-[11px] font-semibold tracking-widest text-[#4a2435]">PE</span>
+          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#C4D2E4] bg-white shadow-sm">
+            <span className="font-display text-[11px] font-semibold tracking-widest text-[#072C57]">PE</span>
           </div>
           <div className="leading-none">
-            <p className="text-[9px] font-medium uppercase tracking-[0.38em] text-[#b96f8d]">Patrícia Elias</p>
-            <p className="text-xs font-semibold text-[#4a2435]">Análise Facial</p>
+            <p className="text-[9px] font-medium uppercase tracking-[0.38em] text-[#0C417D]">Patrícia Elias</p>
+            <p className="text-xs font-semibold text-[#072C57]">Análise Facial</p>
           </div>
         </div>
-        <p className="text-[11px] text-[#9a7282]">Olá, <strong className="text-[#4a2435]">{nome}</strong></p>
+        <p className="text-[11px] text-[#5A7299]">Olá, <strong className="text-[#072C57]">{nome}</strong></p>
       </header>
 
       <div className="flex flex-1 flex-col items-center px-5 py-8 gap-6 dot-grid max-w-lg mx-auto w-full">
 
         {/* Heading */}
         <div className="fu w-full">
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-[#b96f8d]">Escaneamento Facial</p>
-          <h2 className="font-display text-[2rem] font-light text-[#4a2435] leading-tight">
-            Posicione seu rosto <span style={{ fontStyle: 'italic', color: '#7a3f56' }}>no centro</span>.
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-[#0C417D]">Escaneamento Facial</p>
+          <h2 className="font-display text-[2rem] font-light text-[#072C57] leading-tight">
+            Posicione seu rosto <span style={{ fontStyle: 'italic', color: '#0C417D' }}>no centro</span>.
           </h2>
-          <p className="mt-1 text-sm text-[#9a7282]">
+          <p className="mt-1 text-sm text-[#5A7299]">
             A captura acontece automaticamente quando o rosto estiver bem enquadrado. Não precisa apertar nada.
           </p>
         </div>
 
         {/* Camera box */}
         <div className="fu1 w-full relative rounded-2xl overflow-hidden"
-          style={{ background: 'linear-gradient(145deg,#120a0e 0%,#2a0f1c 40%,#1a0b12 100%)' }}>
+          style={{ background: 'linear-gradient(145deg,#020A1A 0%,#072C57 50%,#0B3868 100%)' }}>
           <div className="p-4">
             <div className="relative overflow-hidden rounded-xl" style={{ aspectRatio: '4/3' }}>
               {/* Base video — used for face detection, covered by blur snapshot */}
@@ -647,13 +677,13 @@ function AnalisePage() {
         )}
 
         {scanStatus && (
-          <p className={`fu3 w-full flex items-center gap-2 text-[13px] font-medium ${scanStatus.includes('Erro') || scanStatus.includes('Falha') ? 'text-red-500' : 'text-[#8a6070]'}`}>
-            <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${scanStatus.includes('Erro') || scanStatus.includes('Falha') ? 'bg-red-400' : 'bg-[#b96f8d] animate-pulse'}`} />
+          <p className={`fu3 w-full flex items-center gap-2 text-[13px] font-medium ${scanStatus.includes('Erro') || scanStatus.includes('Falha') ? 'text-red-500' : 'text-[#0C417D]'}`}>
+            <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${scanStatus.includes('Erro') || scanStatus.includes('Falha') ? 'bg-red-400' : 'bg-[#0C417D] animate-pulse'}`} />
             {scanStatus}
           </p>
         )}
 
-        <p className="text-[11px] text-[#c0a8b4] leading-relaxed text-center pb-2">
+        <p className="text-[11px] text-[#7A91B0] leading-relaxed text-center pb-2">
           Suas imagens são processadas com segurança e não são compartilhadas com terceiros.
         </p>
       </div>
@@ -665,8 +695,8 @@ function AnalisePage() {
 export default function AnaliseSuspense() {
   return (
     <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center bg-[#f7f0f3]">
-        <div className="h-8 w-8 rounded-full border-2 border-[#b96f8d]/30 border-t-[#b96f8d] animate-spin" />
+      <div className="flex min-h-screen items-center justify-center bg-[#F2F5FA]">
+        <div className="h-8 w-8 rounded-full border-2 border-[#0C417D]/30 border-t-[#0C417D] animate-spin" />
       </div>
     }>
       <AnalisePage />

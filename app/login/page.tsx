@@ -7,8 +7,8 @@ export default function LoginRedirect() {
   const router = useRouter();
   useEffect(() => { router.replace('/admin'); }, [router]);
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f7f0f3]">
-      <div className="h-8 w-8 rounded-full border-2 border-[#b96f8d]/30 border-t-[#b96f8d] animate-spin" />
+    <div className="flex min-h-screen items-center justify-center bg-[#F2F5FA]">
+      <div className="h-8 w-8 rounded-full border-2 border-[#0C417D]/30 border-t-[#0C417D] animate-spin" />
     </div>
   );
 }

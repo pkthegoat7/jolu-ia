@@ -1,17 +1,17 @@
 import type { ResultadoAnalise } from './analise';
 import type { ProtocoloPersonalizado, SlotProduto, SlotId } from './protocolo';
 
-// Paleta do PDF Joselene — navy profundo + creme + acento dourado.
+// Paleta navy da marca + acentos dourados pra contraste.
 const C = {
-  navyDeep: '#1a3a5f',
-  navyMid: '#2a4a6e',
-  navyText: '#2a3f5a',
-  cream: '#f1ebe0',
-  creamLight: '#f8f3ea',
+  navyDeep: '#072C57',
+  navyMid: '#0C417D',
+  navyText: '#0C417D',
+  cream: '#F2F5FA',
+  creamLight: '#F4F7FB',
   gold: '#c9a575',
   goldSoft: '#d8c5a6',
-  borderSoft: '#e4d8c2',
-  textMuted: '#7a8497',
+  borderSoft: '#C4D2E4',
+  textMuted: '#5A7299',
   white: '#ffffff',
 };
 

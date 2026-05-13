@@ -36,7 +36,7 @@ function MetricBar({ label, value }: { label: string; value: string }) {
   return (
     <div className="glass rounded-2xl p-4">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9a7282]">{label}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#5A7299]">{label}</p>
         <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
           style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text }}>{C.label}</span>
       </div>
@@ -65,17 +65,17 @@ export default function LeadDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f7f0f3]">
-        <div className="h-8 w-8 rounded-full border-2 border-[#b96f8d]/30 border-t-[#b96f8d] animate-spin" />
+      <div className="flex min-h-screen items-center justify-center bg-[#F2F5FA]">
+        <div className="h-8 w-8 rounded-full border-2 border-[#0C417D]/30 border-t-[#0C417D] animate-spin" />
       </div>
     );
   }
 
   if (!lead) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f7f0f3]">
+      <div className="flex min-h-screen items-center justify-center bg-[#F2F5FA]">
         <div className="glass rounded-3xl p-12 text-center">
-          <p className="font-display text-2xl font-light text-[#4a2435]">Lead não encontrado</p>
+          <p className="font-display text-2xl font-light text-[#072C57]">Lead não encontrado</p>
           <button onClick={() => router.push('/admin/dashboard')} className="btn-brand mt-6 rounded-2xl px-8 py-3 text-sm font-semibold">
             Voltar
           </button>
@@ -87,8 +87,8 @@ export default function LeadDetailPage() {
   const ia = lead.analise?.resultado;
 
   return (
-    <div className="min-h-screen bg-[#f7f0f3]">
-      <header className="sticky top-0 z-20 flex items-center justify-between px-6 py-4 border-b border-[#e8d0db]/60 bg-white/70 backdrop-blur-md">
+    <div className="min-h-screen bg-[#F2F5FA]">
+      <header className="sticky top-0 z-20 flex items-center justify-between px-6 py-4 border-b border-[#DDE5F0]/60 bg-white/70 backdrop-blur-md">
         <div className="flex items-center gap-3">
           <button onClick={() => router.push('/admin/dashboard')}
             className="btn-ghost flex items-center gap-2 rounded-xl px-3 py-2 text-[13px] font-semibold">
@@ -97,10 +97,10 @@ export default function LeadDetailPage() {
             </svg>
             Voltar
           </button>
-          <div className="h-5 w-px bg-[#dfc8d4]" />
-          <p className="text-sm font-semibold text-[#4a2435]">Relatório: {lead.nome}</p>
+          <div className="h-5 w-px bg-[#C4D2E4]" />
+          <p className="text-sm font-semibold text-[#072C57]">Relatório: {lead.nome}</p>
         </div>
-        <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#b8a0ac]">
+        <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#8AA2C2]">
           {new Date(lead.createdAt).toLocaleString('pt-BR')}
         </span>
       </header>
@@ -109,7 +109,7 @@ export default function LeadDetailPage() {
 
         {/* Contact card */}
         <div className="glass rounded-2xl p-6 space-y-4">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#b8a0ac]">Dados do Lead</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#8AA2C2]">Dados do Lead</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
               { label: 'Nome', value: lead.nome },
@@ -118,13 +118,13 @@ export default function LeadDetailPage() {
               { label: 'Campanha', value: lead.token.campanha },
             ].map(f => (
               <div key={f.label}>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#b8a0ac]">{f.label}</p>
-                <p className="mt-0.5 text-sm font-medium text-[#4a2435]">{f.value}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8AA2C2]">{f.label}</p>
+                <p className="mt-0.5 text-sm font-medium text-[#072C57]">{f.value}</p>
               </div>
             ))}
           </div>
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#b8a0ac]">Deseja Melhorar</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8AA2C2]">Deseja Melhorar</p>
             <p className="mt-0.5 text-sm text-[#7a5060] italic">"{lead.desejaMelhorar}"</p>
           </div>
         </div>
@@ -137,8 +137,8 @@ export default function LeadDetailPage() {
                 <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
               </svg>
             </div>
-            <p className="font-display text-xl font-light text-[#4a2435]">Análise pendente</p>
-            <p className="mt-1 text-sm text-[#9a7282]">Este lead ainda não passou pelo escaneamento facial.</p>
+            <p className="font-display text-xl font-light text-[#072C57]">Análise pendente</p>
+            <p className="mt-1 text-sm text-[#5A7299]">Este lead ainda não passou pelo escaneamento facial.</p>
           </div>
         ) : (
           <>
@@ -174,13 +174,13 @@ export default function LeadDetailPage() {
                   </div>
                 </div>
               </div>
-              <div className="h-6 w-full" style={{ background: 'linear-gradient(to bottom, transparent, #f7f0f3)' }} />
+              <div className="h-6 w-full" style={{ background: 'linear-gradient(to bottom, transparent, #F2F5FA)' }} />
             </div>
 
             {/* Metrics */}
             {ia && (
               <div>
-                <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.26em] text-[#b8a0ac]">Métricas da Pele</p>
+                <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.26em] text-[#8AA2C2]">Métricas da Pele</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <MetricBar label="Oleosidade"    value={ia.nivelOleosidade}     />
                   <MetricBar label="Acne"           value={ia.nivelAcne}           />
@@ -192,22 +192,22 @@ export default function LeadDetailPage() {
             {/* Products */}
             {ia?.recomendacoes && ia.recomendacoes.length > 0 && (
               <div>
-                <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.26em] text-[#b8a0ac]">Protocolo Recomendado</p>
+                <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.26em] text-[#8AA2C2]">Protocolo Recomendado</p>
                 <div className="space-y-3">
                   {ia.recomendacoes.map((p, i) => (
                     <div key={p.nome} className="glass rounded-2xl overflow-hidden">
                       <div className="flex">
-                        <div className="w-1 flex-shrink-0" style={{ background: 'linear-gradient(to bottom,#7a3f56,#c07898)' }} />
+                        <div className="w-1 flex-shrink-0" style={{ background: 'linear-gradient(to bottom,#0C417D,#3D6BA3)' }} />
                         <div className="flex-1 p-5">
                           <div className="flex items-start gap-4">
                             <div className="flex-shrink-0 flex h-9 w-9 items-center justify-center rounded-xl text-[11px] font-bold text-white"
-                              style={{ background: 'linear-gradient(135deg,#4a2435,#b96f8d)' }}>
+                              style={{ background: 'linear-gradient(135deg,#072C57,#0C417D)' }}>
                               {String(i + 1).padStart(2, '0')}
                             </div>
                             <div className="flex-1 space-y-1">
-                              <p className="text-[13px] font-semibold text-[#4a2435]">{p.nome}</p>
+                              <p className="text-[13px] font-semibold text-[#072C57]">{p.nome}</p>
                               <p className="text-[12px] text-[#7a5060]">{p.motivo}</p>
-                              <p className="text-[12px] text-[#9a7282]">
+                              <p className="text-[12px] text-[#5A7299]">
                                 <span className="font-semibold text-[#7a5060]">Uso:</span> {p.modoDeUso}
                               </p>
                             </div>

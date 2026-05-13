@@ -17,7 +17,7 @@ type LeadsResp = { data: Lead[]; total: number; page: number; limit: number };
 function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div className="glass rounded-2xl p-5 flex flex-col gap-1">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#b8a0ac]">{label}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8AA2C2]">{label}</p>
       <p className="font-display text-4xl font-light" style={{ color }}>{value}</p>
     </div>
   );
@@ -158,16 +158,16 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f7f0f3]">
+    <div className="min-h-screen bg-[#F2F5FA]">
       {/* ── Header ── */}
-      <header className="sticky top-0 z-20 flex items-center justify-between px-6 py-4 border-b border-[#e8d0db]/60 bg-white/70 backdrop-blur-md">
+      <header className="sticky top-0 z-20 flex items-center justify-between px-6 py-4 border-b border-[#DDE5F0]/60 bg-white/70 backdrop-blur-md">
         <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#dfc8d4] bg-white shadow-sm">
-            <span className="font-display text-[11px] font-semibold tracking-widest text-[#4a2435]">PE</span>
+          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#C4D2E4] bg-white shadow-sm">
+            <span className="font-display text-[11px] font-semibold tracking-widest text-[#072C57]">PE</span>
           </div>
           <div className="leading-none">
-            <p className="text-[9px] font-medium uppercase tracking-[0.38em] text-[#b96f8d]">Patrícia Elias</p>
-            <p className="text-xs font-semibold text-[#4a2435]">Painel Administrativo</p>
+            <p className="text-[9px] font-medium uppercase tracking-[0.38em] text-[#0C417D]">Patrícia Elias</p>
+            <p className="text-xs font-semibold text-[#072C57]">Painel Administrativo</p>
           </div>
         </div>
         <button onClick={logout} className="btn-ghost rounded-xl px-4 py-2 text-[13px] font-semibold">Sair</button>
@@ -178,8 +178,8 @@ export default function AdminDashboard() {
         {/* Stats */}
         {stats && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <StatCard label="Total de Leads" value={stats.totalLeads} color="#4a2435" />
-            <StatCard label="Analisadas"    value={stats.analisadas}   color="#b96f8d" />
+            <StatCard label="Total de Leads" value={stats.totalLeads} color="#072C57" />
+            <StatCard label="Analisadas"    value={stats.analisadas}   color="#0C417D" />
             <StatCard label="E-mails Env."  value={stats.emailsEnviados} color="#34d399" />
             <StatCard label="Pendentes"     value={stats.pendentes}    color="#fb923c" />
           </div>
@@ -190,13 +190,13 @@ export default function AdminDashboard() {
           <div className="flex gap-1 p-1 glass rounded-2xl w-fit">
             {(['leads', 'tokens', 'config'] as const).map(t => (
               <button key={t} onClick={() => setTab(t)}
-                className={`rounded-xl px-5 py-2 text-[13px] font-semibold transition-all ${tab === t ? 'bg-white shadow-sm text-[#4a2435]' : 'text-[#9a7282] hover:text-[#4a2435]'}`}>
+                className={`rounded-xl px-5 py-2 text-[13px] font-semibold transition-all ${tab === t ? 'bg-white shadow-sm text-[#072C57]' : 'text-[#5A7299] hover:text-[#072C57]'}`}>
                 {t === 'leads' ? `Leads (${total})` : t === 'tokens' ? 'Campanhas' : 'Configurações'}
               </button>
             ))}
           </div>
           <button onClick={() => router.push('/admin/clinic')}
-            className="rounded-xl border border-[#dfc8d4] bg-white px-4 py-2 text-[13px] font-semibold text-[#4a2435] hover:bg-[#fdf8fb]">
+            className="rounded-xl border border-[#C4D2E4] bg-white px-4 py-2 text-[13px] font-semibold text-[#072C57] hover:bg-[#fdf8fb]">
             Clínica & Catálogo →
           </button>
         </div>
@@ -206,7 +206,7 @@ export default function AdminDashboard() {
           <div className="space-y-4">
             {/* Search */}
             <div className="relative max-w-sm">
-              <svg className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#c4a0b8]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <svg className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8AA2C2]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
               </svg>
               <input type="text" placeholder="Buscar por nome, email, campanha..." value={search}
@@ -216,21 +216,21 @@ export default function AdminDashboard() {
 
             {loading ? (
               <div className="flex items-center justify-center py-20">
-                <div className="h-8 w-8 rounded-full border-2 border-[#b96f8d]/30 border-t-[#b96f8d] animate-spin" />
+                <div className="h-8 w-8 rounded-full border-2 border-[#0C417D]/30 border-t-[#0C417D] animate-spin" />
               </div>
             ) : filtered.length === 0 ? (
               <div className="glass rounded-3xl p-16 text-center">
-                <p className="font-display text-2xl font-light text-[#4a2435]">Nenhum lead ainda</p>
-                <p className="mt-2 text-sm text-[#9a7282]">Crie uma campanha e compartilhe o link para começar a capturar leads.</p>
+                <p className="font-display text-2xl font-light text-[#072C57]">Nenhum lead ainda</p>
+                <p className="mt-2 text-sm text-[#5A7299]">Crie uma campanha e compartilhe o link para começar a capturar leads.</p>
               </div>
             ) : (
               <div className="glass rounded-2xl overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-[#e8d0db]/60">
+                      <tr className="border-b border-[#DDE5F0]/60">
                         {['Nome', 'Email', 'Telefone', 'Campanha', 'Tipo de Pele', 'Data', 'Status', ''].map((h, i) => (
-                          <th key={i} className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-[#b8a0ac]">{h}</th>
+                          <th key={i} className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8AA2C2]">{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -238,26 +238,26 @@ export default function AdminDashboard() {
                       {filtered.map((l, i) => (
                         <tr key={l.id}
                           onClick={() => router.push(`/admin/leads/${l.id}`)}
-                          className={`cursor-pointer transition-colors hover:bg-[#f7f0f3] ${i % 2 === 0 ? '' : 'bg-[#fdf8fb]'}`}>
-                          <td className="px-4 py-3.5 font-medium text-[#4a2435]">{l.nome}</td>
+                          className={`cursor-pointer transition-colors hover:bg-[#F2F5FA] ${i % 2 === 0 ? '' : 'bg-[#fdf8fb]'}`}>
+                          <td className="px-4 py-3.5 font-medium text-[#072C57]">{l.nome}</td>
                           <td className="px-4 py-3.5 text-[#7a5060]">{l.email}</td>
                           <td className="px-4 py-3.5 text-[#7a5060]">{l.telefone}</td>
                           <td className="px-4 py-3.5">
-                            <span className="rounded-full px-2.5 py-0.5 text-[11px] font-medium bg-[#f3e8f0] text-[#7a3f56]">
+                            <span className="rounded-full px-2.5 py-0.5 text-[11px] font-medium bg-[#f3e8f0] text-[#0C417D]">
                               {l.token.campanha}
                             </span>
                           </td>
                           <td className="px-4 py-3.5">
                             {l.analise?.resultado?.tipoPele ? (
                               <span className="rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-                                style={{ background: `${skinColor[l.analise.resultado.tipoPele] ?? '#9a7282'}22`, color: skinColor[l.analise.resultado.tipoPele] ?? '#9a7282' }}>
+                                style={{ background: `${skinColor[l.analise.resultado.tipoPele] ?? '#5A7299'}22`, color: skinColor[l.analise.resultado.tipoPele] ?? '#5A7299' }}>
                                 {l.analise.resultado.tipoPele}
                               </span>
                             ) : (
-                              <span className="text-[#c0a8b4] text-[11px]">—</span>
+                              <span className="text-[#7A91B0] text-[11px]">—</span>
                             )}
                           </td>
-                          <td className="px-4 py-3.5 text-[11px] text-[#b8a0ac]">
+                          <td className="px-4 py-3.5 text-[11px] text-[#8AA2C2]">
                             {new Date(l.createdAt).toLocaleDateString('pt-BR')}
                           </td>
                           <td className="px-4 py-3.5">
@@ -274,7 +274,7 @@ export default function AdminDashboard() {
                           <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
                             <button
                               onClick={() => setConfirmDeleteId(l.id)}
-                              className="flex items-center justify-center h-7 w-7 rounded-lg text-[#c4a0b8] hover:bg-red-50 hover:text-red-500 transition-colors"
+                              className="flex items-center justify-center h-7 w-7 rounded-lg text-[#8AA2C2] hover:bg-red-50 hover:text-red-500 transition-colors"
                               title="Apagar lead">
                               <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
@@ -292,11 +292,11 @@ export default function AdminDashboard() {
             {/* Pagination */}
             {total > 30 && (
               <div className="flex items-center justify-between text-sm">
-                <p className="text-[#9a7282]">{total} leads no total</p>
+                <p className="text-[#5A7299]">{total} leads no total</p>
                 <div className="flex items-center gap-2">
                   <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
                     className="btn-ghost rounded-xl px-4 py-2 text-[13px] font-semibold disabled:opacity-40">Anterior</button>
-                  <span className="text-[13px] text-[#9a7282]">Página {page} de {Math.ceil(total / 30)}</span>
+                  <span className="text-[13px] text-[#5A7299]">Página {page} de {Math.ceil(total / 30)}</span>
                   <button disabled={page * 30 >= total} onClick={() => setPage(p => p + 1)}
                     className="btn-ghost rounded-xl px-4 py-2 text-[13px] font-semibold disabled:opacity-40">Próximo</button>
                 </div>
@@ -310,7 +310,7 @@ export default function AdminDashboard() {
           <div className="space-y-6">
             {/* Create token */}
             <div className="glass rounded-2xl p-6">
-              <p className="mb-4 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#b8a0ac]">Novo Link de Campanha</p>
+              <p className="mb-4 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#8AA2C2]">Novo Link de Campanha</p>
               <form onSubmit={createToken} className="flex flex-col sm:flex-row gap-3">
                 <input type="text" placeholder="Nome da campanha (ex: Instagram Mai/2026)" value={newCampanha}
                   onChange={e => setNewCampanha(e.target.value)} required className="field flex-1" />
@@ -326,8 +326,8 @@ export default function AdminDashboard() {
             {/* Token list */}
             {tokens.length === 0 ? (
               <div className="glass rounded-3xl p-12 text-center">
-                <p className="font-display text-2xl font-light text-[#4a2435]">Nenhuma campanha</p>
-                <p className="mt-2 text-sm text-[#9a7282]">Crie seu primeiro link de campanha acima.</p>
+                <p className="font-display text-2xl font-light text-[#072C57]">Nenhuma campanha</p>
+                <p className="mt-2 text-sm text-[#5A7299]">Crie seu primeiro link de campanha acima.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -337,11 +337,11 @@ export default function AdminDashboard() {
                     <div key={t.id} className="glass rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center gap-4">
                       <div className="flex-1 min-w-0 space-y-1.5">
                         <div className="flex items-center gap-2">
-                          <p className="font-semibold text-[#4a2435]">{t.campanha}</p>
+                          <p className="font-semibold text-[#072C57]">{t.campanha}</p>
                           <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${t.ativo ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
                             {t.ativo ? 'Ativo' : 'Inativo'}
                           </span>
-                          <span className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-[#f3e8f0] text-[#7a3f56]">
+                          <span className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-[#f3e8f0] text-[#0C417D]">
                             {t._count.leads} leads
                           </span>
                         </div>
@@ -350,11 +350,11 @@ export default function AdminDashboard() {
                             {link}
                           </code>
                           <button onClick={() => navigator.clipboard.writeText(link)}
-                            className="text-[11px] text-[#b96f8d] hover:text-[#7a3f56] font-medium transition-colors whitespace-nowrap">
+                            className="text-[11px] text-[#0C417D] hover:text-[#0C417D] font-medium transition-colors whitespace-nowrap">
                             Copiar
                           </button>
                         </div>
-                        <p className="text-[11px] text-[#b8a0ac]">
+                        <p className="text-[11px] text-[#8AA2C2]">
                           Criado em {new Date(t.createdAt).toLocaleDateString('pt-BR')}
                         </p>
                       </div>
@@ -365,7 +365,7 @@ export default function AdminDashboard() {
                         </button>
                         <button
                           onClick={() => setConfirmDeleteTokenId(t.id)}
-                          className="flex items-center justify-center h-9 w-9 rounded-xl text-[#c4a0b8] hover:bg-red-50 hover:text-red-500 transition-colors"
+                          className="flex items-center justify-center h-9 w-9 rounded-xl text-[#8AA2C2] hover:bg-red-50 hover:text-red-500 transition-colors"
                           title="Apagar campanha">
                           <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
@@ -383,13 +383,13 @@ export default function AdminDashboard() {
         {tab === 'config' && (
           <div className="space-y-6 max-w-xl">
             <div className="glass rounded-2xl p-6">
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#b8a0ac]">Webhook de Notificação</p>
-              <p className="mb-5 text-sm text-[#9a7282] leading-relaxed">
-                Quando uma análise for concluída, o sistema envia um <code className="bg-[#f3e8f0] text-[#7a3f56] rounded px-1.5 py-0.5 text-[11px]">POST</code> para esta URL com os dados do lead e o diagnóstico de pele.
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#8AA2C2]">Webhook de Notificação</p>
+              <p className="mb-5 text-sm text-[#5A7299] leading-relaxed">
+                Quando uma análise for concluída, o sistema envia um <code className="bg-[#f3e8f0] text-[#0C417D] rounded px-1.5 py-0.5 text-[11px]">POST</code> para esta URL com os dados do lead e o diagnóstico de pele.
               </p>
               <form onSubmit={saveSettings} className="space-y-4">
                 <div>
-                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8b3f5a]">
+                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0C417D]">
                     URL do Webhook
                   </label>
                   <input
@@ -399,8 +399,8 @@ export default function AdminDashboard() {
                     onChange={e => setWebhookUrl(e.target.value)}
                     className="field w-full"
                   />
-                  <p className="mt-1.5 text-[11px] text-[#b8a0ac]">
-                    Deixe em branco para desativar. Assine os payloads com <code className="bg-[#f3e8f0] text-[#7a3f56] rounded px-1 py-0.5">WEBHOOK_SECRET</code> nas variáveis de ambiente.
+                  <p className="mt-1.5 text-[11px] text-[#8AA2C2]">
+                    Deixe em branco para desativar. Assine os payloads com <code className="bg-[#f3e8f0] text-[#0C417D] rounded px-1 py-0.5">WEBHOOK_SECRET</code> nas variáveis de ambiente.
                   </p>
                 </div>
 
@@ -418,8 +418,8 @@ export default function AdminDashboard() {
             </div>
 
             <div className="glass rounded-2xl p-6">
-              <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#b8a0ac]">Exemplo de Payload</p>
-              <pre className="text-[11px] text-[#7a5060] bg-[#f7f0f3] rounded-xl p-4 overflow-x-auto leading-relaxed">{`{
+              <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#8AA2C2]">Exemplo de Payload</p>
+              <pre className="text-[11px] text-[#7a5060] bg-[#F2F5FA] rounded-xl p-4 overflow-x-auto leading-relaxed">{`{
   "event": "lead.analyzed",
   "timestamp": "2026-05-04T11:00:00Z",
   "data": {
@@ -455,16 +455,16 @@ export default function AdminDashboard() {
                   <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
                 </svg>
               </div>
-              <h2 className="font-display text-xl font-light text-[#4a2435] mb-2">Apagar campanha?</h2>
-              <p className="text-sm text-[#9a7282] mb-2 leading-relaxed">
-                <strong className="text-[#4a2435]">{t?.campanha}</strong>
+              <h2 className="font-display text-xl font-light text-[#072C57] mb-2">Apagar campanha?</h2>
+              <p className="text-sm text-[#5A7299] mb-2 leading-relaxed">
+                <strong className="text-[#072C57]">{t?.campanha}</strong>
               </p>
               {t && t._count.leads > 0 && (
                 <p className="text-sm text-red-500 mb-4 leading-relaxed">
                   Atenção: {t._count.leads} lead{t._count.leads > 1 ? 's' : ''} vinculado{t._count.leads > 1 ? 's' : ''} também {t._count.leads > 1 ? 'serão apagados' : 'será apagado'}.
                 </p>
               )}
-              <p className="text-sm text-[#9a7282] mb-7 leading-relaxed">Esta ação é irreversível.</p>
+              <p className="text-sm text-[#5A7299] mb-7 leading-relaxed">Esta ação é irreversível.</p>
               <div className="flex gap-3">
                 <button
                   onClick={() => setConfirmDeleteTokenId(null)}
@@ -495,8 +495,8 @@ export default function AdminDashboard() {
                 <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
               </svg>
             </div>
-            <h2 className="font-display text-xl font-light text-[#4a2435] mb-2">Apagar este lead?</h2>
-            <p className="text-sm text-[#9a7282] mb-7 leading-relaxed">
+            <h2 className="font-display text-xl font-light text-[#072C57] mb-2">Apagar este lead?</h2>
+            <p className="text-sm text-[#5A7299] mb-7 leading-relaxed">
               Esta ação é irreversível. O lead e sua análise serão removidos permanentemente.
             </p>
             <div className="flex gap-3">

@@ -15,9 +15,9 @@ function Field({ id, label, type, ph, val, set, Icon }: {
 }) {
   return (
     <div>
-      <label htmlFor={id} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8b3f5a]">{label}</label>
+      <label htmlFor={id} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0C417D]">{label}</label>
       <div className="relative">
-        <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#c4a0b8]"><Icon /></span>
+        <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8AA2C2]"><Icon /></span>
         <input id={id} type={type} placeholder={ph} value={val} required className="field" onChange={e => set(e.target.value)} />
       </div>
     </div>
@@ -95,7 +95,7 @@ export default function AdminLoginPage() {
           <div className="space-y-3.5">
             {[
               { dot: '#c9a575', text: 'Relatório completo de cada lead' },
-              { dot: '#c07898', text: 'Diagnóstico detalhado da pele' },
+              { dot: '#3D6BA3', text: 'Diagnóstico detalhado da pele' },
               { dot: '#9080c0', text: 'Gestão de links de campanha' },
             ].map(f => (
               <div key={f.text} className="flex items-center gap-3">
@@ -117,18 +117,18 @@ export default function AdminLoginPage() {
 
         <div className="relative z-10 w-full max-w-[390px] space-y-7">
           <div className="lg:hidden mb-5">
-            <p className="text-[10px] uppercase tracking-[0.52em] text-[#b96f8d] mb-1">Patrícia Elias</p>
-            <p className="font-display text-[2rem] font-light text-[#4a2435] leading-none">Painel Admin</p>
+            <p className="text-[10px] uppercase tracking-[0.52em] text-[#0C417D] mb-1">Patrícia Elias</p>
+            <p className="font-display text-[2rem] font-light text-[#072C57] leading-none">Painel Admin</p>
           </div>
 
           <div className="fu">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full px-4 py-1.5"
               style={{ background: 'linear-gradient(135deg,rgba(74,36,53,.07),rgba(192,120,152,.11))', border: '1px solid rgba(192,120,152,.28)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.65),0 2px 8px rgba(107,45,69,.08)' }}>
-              <div className="h-1.5 w-1.5 rounded-full" style={{ background: 'linear-gradient(135deg,#c9a575,#c07898)', boxShadow: '0 0 5px rgba(201,165,117,.55)' }} />
-              <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8b3f5a]">Acesso Administrativo</span>
+              <div className="h-1.5 w-1.5 rounded-full" style={{ background: 'linear-gradient(135deg,#c9a575,#3D6BA3)', boxShadow: '0 0 5px rgba(201,165,117,.55)' }} />
+              <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#0C417D]">Acesso Administrativo</span>
             </div>
-            <h1 className="font-display text-[2.6rem] font-light leading-tight text-[#4a2435]">Bem-vindo<br />de volta.</h1>
-            <p className="mt-2 text-sm text-[#9a7282]">Entre para acessar o painel de gestão de leads.</p>
+            <h1 className="font-display text-[2.6rem] font-light leading-tight text-[#072C57]">Bem-vindo<br />de volta.</h1>
+            <p className="mt-2 text-sm text-[#5A7299]">Entre para acessar o painel de gestão de leads.</p>
           </div>
 
           <div className="fu1 glass rounded-3xl p-8"

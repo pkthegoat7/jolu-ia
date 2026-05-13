@@ -67,13 +67,13 @@ function MetricCard({ label, value, icon }: { label: string; value: string; icon
       <div className="h-1 w-full" style={{ background: C.bar, opacity:.85 }} />
       <div className="p-4">
         <div className="mb-3 flex items-center justify-between">
-          <span className="text-[#9a7282]">{icon}</span>
+          <span className="text-[#5A7299]">{icon}</span>
           <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
             style={{ background: C.bg, border:`1px solid ${C.border}`, color: C.text }}>
             {C.label}
           </span>
         </div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9a7282]">{label}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#5A7299]">{label}</p>
         <div className="mt-2.5 h-1.5 w-full rounded-full" style={{ background:'#ead9e0' }}>
           <div className="h-full rounded-full" style={{ width:`${pct}%`, background:C.bar, transition:'width 1.2s cubic-bezier(.4,0,.2,1)' }} />
         </div>
@@ -104,17 +104,17 @@ export default function DashboardPage() {
   const skinTag = ia ? SKIN_TAG[ia.tipoPele] : null;
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#f7f0f3]">
+    <div className="min-h-screen flex flex-col bg-[#F2F5FA]">
 
       {/* ── Header ── */}
-      <header className="flex items-center justify-between px-7 py-4 border-b border-[#e8d0db]/60 bg-white/60 backdrop-blur-md sticky top-0 z-20">
+      <header className="flex items-center justify-between px-7 py-4 border-b border-[#DDE5F0]/60 bg-white/60 backdrop-blur-md sticky top-0 z-20">
         <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#dfc8d4] bg-white shadow-sm">
-            <span className="font-display text-[11px] font-semibold tracking-widest text-[#4a2435]">PE</span>
+          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#C4D2E4] bg-white shadow-sm">
+            <span className="font-display text-[11px] font-semibold tracking-widest text-[#072C57]">PE</span>
           </div>
           <div className="leading-none">
-            <p className="text-[9px] font-medium uppercase tracking-[0.38em] text-[#b96f8d]">Patrícia Elias</p>
-            <p className="text-xs font-semibold text-[#4a2435]">Skin Intelligence</p>
+            <p className="text-[9px] font-medium uppercase tracking-[0.38em] text-[#0C417D]">Patrícia Elias</p>
+            <p className="text-xs font-semibold text-[#072C57]">Skin Intelligence</p>
           </div>
         </div>
         <button onClick={() => router.push('/')}
@@ -130,14 +130,14 @@ export default function DashboardPage() {
         /* ── Empty state ── */
         <div className="flex flex-1 items-center justify-center p-8">
           <div className="fu glass rounded-3xl p-14 text-center max-w-sm w-full">
-            <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl border border-[#dfc8d4]"
+            <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl border border-[#C4D2E4]"
               style={{ background:'linear-gradient(135deg,rgba(185,111,141,.08),rgba(122,63,86,.14))' }}>
-              <svg className="h-10 w-10 text-[#b96f8d]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4">
+              <svg className="h-10 w-10 text-[#0C417D]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4">
                 <path d="M9 12h6M9 16h6M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"/>
               </svg>
             </div>
-            <p className="font-display text-3xl font-light text-[#4a2435] mb-2">Sem análise</p>
-            <p className="text-sm text-[#9a7282] mb-8 leading-relaxed">
+            <p className="font-display text-3xl font-light text-[#072C57] mb-2">Sem análise</p>
+            <p className="text-sm text-[#5A7299] mb-8 leading-relaxed">
               Faça seu primeiro scan para receber seu diagnóstico personalizado de pele.
             </p>
             <button onClick={() => router.push('/')} className="btn-brand w-full rounded-2xl py-3.5 text-sm font-semibold">
@@ -225,7 +225,7 @@ export default function DashboardPage() {
 
             {/* Bottom fade */}
             <div className="h-6 w-full"
-              style={{ background:'linear-gradient(to bottom, transparent, #f7f0f3)' }} />
+              style={{ background:'linear-gradient(to bottom, transparent, #F2F5FA)' }} />
           </div>
 
           {/* ── Content ── */}
@@ -234,7 +234,7 @@ export default function DashboardPage() {
             {/* Metrics grid */}
             {ia && (
               <div className="fu1">
-                <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.26em] text-[#b8a0ac]">Métricas da Pele</p>
+                <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.26em] text-[#8AA2C2]">Métricas da Pele</p>
                 <div className="grid grid-cols-3 gap-3">
                   <MetricCard label="Oleosidade"  value={ia.nivelOleosidade} icon={MetricIcons.oil}  />
                   <MetricCard label="Acne"        value={ia.nivelAcne}       icon={MetricIcons.acne} />
@@ -247,27 +247,27 @@ export default function DashboardPage() {
             {ia?.recomendacoes && ia.recomendacoes.length > 0 && (
               <div className="fu2">
                 <div className="mb-3 flex items-center justify-between">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-[#b8a0ac]">Produtos Recomendados</p>
-                  <span className="text-[11px] text-[#b8a0ac]">{ia.recomendacoes.length} itens</span>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-[#8AA2C2]">Produtos Recomendados</p>
+                  <span className="text-[11px] text-[#8AA2C2]">{ia.recomendacoes.length} itens</span>
                 </div>
                 <div className="space-y-3">
                   {ia.recomendacoes.map((p, i) => (
                     <div key={p.nome} className="card-lift glass rounded-2xl overflow-hidden">
                       {/* Left accent bar */}
                       <div className="flex">
-                        <div className="w-1 flex-shrink-0" style={{ background:'linear-gradient(to bottom, #7a3f56, #c07898)' }} />
+                        <div className="w-1 flex-shrink-0" style={{ background:'linear-gradient(to bottom, #0C417D, #3D6BA3)' }} />
                         <div className="flex-1 p-5">
                           <div className="flex items-start gap-4">
                             <div className="flex-shrink-0 flex h-10 w-10 items-center justify-center rounded-xl text-[11px] font-bold text-white"
-                              style={{ background:'linear-gradient(135deg,#4a2435,#b96f8d)' }}>
+                              style={{ background:'linear-gradient(135deg,#072C57,#0C417D)' }}>
                               {String(i + 1).padStart(2, '0')}
                             </div>
                             <div className="flex-1 min-w-0 space-y-1.5">
-                              <p className="text-[13px] font-semibold text-[#4a2435] leading-snug">{p.nome}</p>
+                              <p className="text-[13px] font-semibold text-[#072C57] leading-snug">{p.nome}</p>
                               <p className="text-[12px] text-[#7a5060] leading-relaxed">{p.motivo}</p>
                               <div className="flex gap-1.5 items-start">
-                                <span className="text-[#b96f8d] font-bold text-sm leading-[1.5]">›</span>
-                                <p className="text-[12px] text-[#9a7282] leading-relaxed">
+                                <span className="text-[#0C417D] font-bold text-sm leading-[1.5]">›</span>
+                                <p className="text-[12px] text-[#5A7299] leading-relaxed">
                                   <span className="font-semibold text-[#7a5060]">Modo de uso:</span> {p.modoDeUso}
                                 </p>
                               </div>

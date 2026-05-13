@@ -60,35 +60,35 @@ export default function ClinicAdminPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f7f0f3]">
-        <div className="h-8 w-8 rounded-full border-2 border-[#b96f8d]/30 border-t-[#b96f8d] animate-spin" />
+      <div className="flex min-h-screen items-center justify-center bg-[#F2F5FA]">
+        <div className="h-8 w-8 rounded-full border-2 border-[#0C417D]/30 border-t-[#0C417D] animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#f7f0f3] px-5 py-8">
+    <div className="min-h-screen bg-[#F2F5FA] px-5 py-8">
       <div className="mx-auto w-full max-w-3xl space-y-6">
         <header className="flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[#b96f8d]">Clínica</p>
-            <h1 className="font-display text-3xl font-light text-[#4a2435]">{clinic?.name ?? '—'}</h1>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[#0C417D]">Clínica</p>
+            <h1 className="font-display text-3xl font-light text-[#072C57]">{clinic?.name ?? '—'}</h1>
           </div>
           <button onClick={() => router.push('/admin/dashboard')}
-            className="rounded-xl border border-[#dfc8d4] bg-white px-4 py-2 text-sm text-[#4a2435] hover:bg-[#fdf8fb]">
+            className="rounded-xl border border-[#C4D2E4] bg-white px-4 py-2 text-sm text-[#072C57] hover:bg-[#fdf8fb]">
             ← Dashboard
           </button>
         </header>
 
-        <div className="flex gap-2 border-b border-[#e8d0db]">
+        <div className="flex gap-2 border-b border-[#DDE5F0]">
           {(['settings', 'sources'] as const).map((t) => (
             <button
               key={t}
               onClick={() => { setTab(t); setMsg(null); }}
               className={`px-4 py-2 text-sm font-semibold transition-colors ${
                 tab === t
-                  ? 'border-b-2 border-[#b96f8d] text-[#4a2435]'
-                  : 'text-[#9a7282] hover:text-[#4a2435]'
+                  ? 'border-b-2 border-[#0C417D] text-[#072C57]'
+                  : 'text-[#5A7299] hover:text-[#072C57]'
               }`}
             >
               {t === 'settings' ? 'Configurações' : 'Fontes de Catálogo'}
@@ -184,12 +184,12 @@ function SettingsForm({
       <Field label="Brand tagline" value={brandTagline} set={setBrandTagline} hint='Subtítulo (ex: "Skin Intelligence").' />
       <Field label="Logo URL" value={logoUrl} set={setLogoUrl} type="url" hint="URL pública da imagem (https). Deixe vazio pra usar texto." />
       <div className="space-y-1.5">
-        <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8b3f5a]">Cor primária</label>
+        <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0C417D]">Cor primária</label>
         <div className="flex items-center gap-3">
           <input type="color" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)}
-            className="h-10 w-16 cursor-pointer rounded-lg border border-[#dfc8d4]" />
+            className="h-10 w-16 cursor-pointer rounded-lg border border-[#C4D2E4]" />
           <input type="text" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)}
-            placeholder="#b96f8d" className="field flex-1" maxLength={7} />
+            placeholder="#0C417D" className="field flex-1" maxLength={7} />
         </div>
       </div>
       <Field label="Sender email" value={senderEmail} set={setSenderEmail} type="email" hint="Reply-to dos e-mails (opcional)." />
@@ -296,10 +296,10 @@ function SourcesPanel({
 
       {creating && (
         <form onSubmit={create} className="glass rounded-2xl p-6 space-y-4">
-          <p className="text-sm font-semibold text-[#4a2435]">Nova fonte de catálogo</p>
+          <p className="text-sm font-semibold text-[#072C57]">Nova fonte de catálogo</p>
           <Field label="Nome" value={name} set={setName} required hint="Ex: Loja PE Hetzner" />
           <div className="space-y-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8b3f5a]">Tipo</label>
+            <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0C417D]">Tipo</label>
             <select value={type} onChange={e => setType(e.target.value as CatalogType)}
               className="field">
               <option value="PGVECTOR">PGVECTOR (busca vetorial via OpenAI)</option>
@@ -313,7 +313,7 @@ function SourcesPanel({
             hint="Maior = mais prioritária quando há múltiplas fontes ativas." />
           <div className="flex gap-3">
             <button type="button" onClick={() => { setCreating(false); resetForm(); }}
-              className="flex-1 rounded-2xl border border-[#dfc8d4] bg-white py-3 text-sm font-semibold text-[#4a2435]">
+              className="flex-1 rounded-2xl border border-[#C4D2E4] bg-white py-3 text-sm font-semibold text-[#072C57]">
               Cancelar
             </button>
             <button type="submit" disabled={busy}
@@ -325,7 +325,7 @@ function SourcesPanel({
       )}
 
       {sources.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-[#dfc8d4] p-8 text-center text-sm text-[#9a7282]">
+        <p className="rounded-2xl border border-dashed border-[#C4D2E4] p-8 text-center text-sm text-[#5A7299]">
           Nenhuma fonte cadastrada. Sem fontes ativas, o sistema usa o fallback hardcoded.
         </p>
       ) : (
@@ -403,7 +403,7 @@ function SourceRow({
         <Field label="Prioridade" value={prioridade} set={setPrioridade} type="number" />
         <div className="flex gap-3">
           <button type="button" onClick={onCancelEdit}
-            className="flex-1 rounded-2xl border border-[#dfc8d4] bg-white py-2.5 text-sm font-semibold text-[#4a2435]">
+            className="flex-1 rounded-2xl border border-[#C4D2E4] bg-white py-2.5 text-sm font-semibold text-[#072C57]">
             Cancelar
           </button>
           <button type="submit" disabled={busy}
@@ -420,24 +420,24 @@ function SourceRow({
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <p className="font-semibold text-[#4a2435]">{source.name}</p>
+            <p className="font-semibold text-[#072C57]">{source.name}</p>
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
               source.ativo ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'
             }`}>
               {source.ativo ? 'Ativo' : 'Inativo'}
             </span>
           </div>
-          <p className="mt-1 text-xs text-[#9a7282]">
+          <p className="mt-1 text-xs text-[#5A7299]">
             <strong>{source.type}</strong> · prefix <code className="font-mono">{source.envPrefix}</code> · prioridade {source.prioridade}
           </p>
         </div>
         <div className="flex flex-shrink-0 gap-2">
           <button onClick={onToggle}
-            className="rounded-lg border border-[#dfc8d4] bg-white px-3 py-1.5 text-xs font-semibold text-[#4a2435]">
+            className="rounded-lg border border-[#C4D2E4] bg-white px-3 py-1.5 text-xs font-semibold text-[#072C57]">
             {source.ativo ? 'Desativar' : 'Ativar'}
           </button>
           <button onClick={onEdit}
-            className="rounded-lg border border-[#dfc8d4] bg-white px-3 py-1.5 text-xs font-semibold text-[#4a2435]">
+            className="rounded-lg border border-[#C4D2E4] bg-white px-3 py-1.5 text-xs font-semibold text-[#072C57]">
             Editar
           </button>
           <button onClick={onAskDelete}
@@ -451,7 +451,7 @@ function SourceRow({
           <p className="text-sm text-red-700">Excluir esta fonte? Análises antigas mantêm o registro.</p>
           <div className="flex gap-2">
             <button onClick={onCancelDelete}
-              className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-[#4a2435]">
+              className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-[#072C57]">
               Cancelar
             </button>
             <button onClick={onConfirmDelete}
@@ -478,11 +478,11 @@ function Field({
 }) {
   return (
     <div className="space-y-1.5">
-      <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8b3f5a]">{label}</label>
+      <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0C417D]">{label}</label>
       <input type={type} value={value} required={required}
         onChange={e => set(e.target.value)}
         className="field" />
-      {hint && <p className="text-xs text-[#b8a0ac]">{hint}</p>}
+      {hint && <p className="text-xs text-[#8AA2C2]">{hint}</p>}
     </div>
   );
 }
