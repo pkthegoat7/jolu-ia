@@ -130,6 +130,76 @@ function deriveEstrategia(d: SkinDiagnosis): string {
   return partes.join(' ');
 }
 
+// Palavras-chave que descrevem o perfil de pele em termos de produto cosmético.
+// Inseridas na query de embedding pra direcionar a busca pra produtos compatíveis.
+function diagnosisKeywords(d: SkinDiagnosis): string[] {
+  const kw: string[] = [];
+
+  if (d.tipoPele === 'Oleosa') {
+    kw.push('para pele oleosa', 'toque seco', 'oil free', 'matte', 'não comedogênico');
+  } else if (d.tipoPele === 'Seca/Sensivel') {
+    kw.push('para pele seca sensível', 'calmante', 'reparador', 'nutritivo', 'sem fragrância');
+  } else {
+    kw.push('para pele mista', 'equilibrante', 'hidratação leve');
+  }
+
+  if (d.nivelOleosidade === 'Alta') kw.push('controle de oleosidade', 'seborregulador');
+  if (d.nivelAcne === 'Severa' || d.nivelAcne === 'Moderada') {
+    kw.push('controle de acne', 'antiacne', 'ácido salicílico', 'niacinamida');
+  }
+  if (d.nivelSensibilidade === 'Alta') {
+    kw.push('hipoalergênico', 'pele reativa', 'barreira cutânea', 'pantenol', 'centella asiática');
+  }
+
+  return kw;
+}
+
+// Adapta a query de cada slot ao diagnóstico, evitando ativos contraindicados
+// e reforçando os indicados. Ex: pra pele seca, troca "gel" por "creme/leite" no slot de limpeza.
+function slotQueryForDiagnosis(slot: SlotDef, d: SkinDiagnosis): string {
+  const profile = diagnosisKeywords(d).join(' ');
+
+  switch (slot.id) {
+    case 'limpeza':
+      if (d.tipoPele === 'Seca/Sensivel') {
+        return `leite de limpeza facial creme suave hidratante calmante ${profile}`;
+      }
+      if (d.nivelOleosidade === 'Alta' || d.nivelAcne === 'Severa' || d.nivelAcne === 'Moderada') {
+        return `gel de limpeza facial purificante ácido salicílico antiacne ${profile}`;
+      }
+      return `${slot.query} ${profile}`;
+
+    case 'tonico':
+      if (d.nivelSensibilidade === 'Alta') {
+        return `tônico facial calmante água termal pantenol sem álcool ${profile}`;
+      }
+      return `${slot.query} ${profile}`;
+
+    case 'hidratante':
+      if (d.tipoPele === 'Oleosa' || d.nivelOleosidade === 'Alta') {
+        return `gel hidratante facial oil free toque seco ácido hialurônico ${profile}`;
+      }
+      if (d.tipoPele === 'Seca/Sensivel') {
+        return `creme hidratante facial nutritivo reparador ácido hialurônico ceramidas ${profile}`;
+      }
+      return `${slot.query} ${profile}`;
+
+    case 'protetor_solar':
+      if (d.tipoPele === 'Oleosa' || d.nivelAcne === 'Severa' || d.nivelAcne === 'Moderada') {
+        return `protetor solar facial toque seco oil free matte antiacne FPS ${profile}`;
+      }
+      return `${slot.query} ${profile}`;
+
+    case 'serum_creme':
+    case 'iluminador':
+    case 'ativo_renovador':
+    case 'selante_nutritivo':
+    case 'suplemento':
+    default:
+      return `${slot.query} ${profile}`;
+  }
+}
+
 export async function montarProtocolo(
   diagnosis: SkinDiagnosis,
   desejaMelhorar: string,
@@ -139,8 +209,12 @@ export async function montarProtocolo(
   let catalogSourceId: string | null = null;
   const faltandoEssenciais: string[] = [];
 
+  // Inclui o desejo do usuario no contexto da busca (ex: "reduzir manchas")
+  const desejoCtx = desejaMelhorar.trim() ? `Objetivo: ${desejaMelhorar.trim()}.` : '';
+
   for (const slot of SLOTS) {
-    const { product, sourceId } = await searchProductsForSlot(slot.query, diagnosis, clinicId);
+    const query = `${slotQueryForDiagnosis(slot, diagnosis)} ${desejoCtx}`.trim();
+    const { product, sourceId } = await searchProductsForSlot(query, diagnosis, clinicId);
     if (sourceId) catalogSourceId = sourceId;
     if (product) {
       slotsEncontrados.push({ slot, produto: product });
