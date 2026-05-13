@@ -130,6 +130,57 @@ function deriveEstrategia(d: SkinDiagnosis): string {
   return partes.join(' ');
 }
 
+// Mapeia os objetivos selecionados pelo usuário em keywords cosméticos
+// que viram parte da query de embedding (direciona ativos da busca).
+function desiresKeywords(desejaMelhorar: string): { all: string[]; perSlot: Partial<Record<SlotId, string[]>> } {
+  const text = desejaMelhorar.toLowerCase();
+  const all: string[] = [];
+  const perSlot: Partial<Record<SlotId, string[]>> = {};
+
+  const has = (...needles: string[]) => needles.some((n) => text.includes(n));
+
+  if (has('mancha', 'clarear', 'uniformizar', 'tom')) {
+    all.push('clareador', 'uniformizador', 'manchas', 'hiperpigmentação');
+    perSlot.iluminador = ['niacinamida', 'ácido tranexâmico', 'alfa-arbutin', 'vitamina C'];
+    perSlot.serum_creme = ['vitamina C', 'antioxidante'];
+  }
+
+  if (has('ruga', 'linha', 'expressão', 'lifting', 'firmeza')) {
+    all.push('antiidade', 'antirrugas', 'firmeza', 'lifting');
+    perSlot.serum_creme = [...(perSlot.serum_creme ?? []), 'peptídeos', 'preenchedor', 'colágeno'];
+    perSlot.ativo_renovador = ['retinol', 'tretinoína', 'ácido retinóico'];
+    perSlot.suplemento = ['colágeno hidrolisado', 'verisol', 'peptídeos bioativos'];
+  }
+
+  if (has('oleosidade', 'oleos')) {
+    all.push('controle de oleosidade', 'matte', 'oil free', 'seborregulador');
+    perSlot.limpeza = ['gel purificante', 'controle de oleosidade'];
+    perSlot.hidratante = ['gel oil free', 'toque seco'];
+    perSlot.protetor_solar = ['toque seco', 'matte', 'oil free'];
+  }
+
+  if (has('poro')) {
+    all.push('redutor de poros', 'minimizador de poros', 'adstringente');
+    perSlot.tonico = ['adstringente', 'niacinamida'];
+    perSlot.serum_creme = [...(perSlot.serum_creme ?? []), 'niacinamida', 'ácido salicílico'];
+  }
+
+  if (has('hidrat', 'seca', 'ressec')) {
+    all.push('hidratação profunda', 'nutritivo', 'reparador');
+    perSlot.hidratante = ['ácido hialurônico', 'ceramidas', 'creme nutritivo'];
+    perSlot.selante_nutritivo = ['óleo facial', 'rosa mosqueta', 'esqualano'];
+  }
+
+  if (has('acne', 'espinha')) {
+    all.push('antiacne', 'controle de acne');
+    perSlot.limpeza = [...(perSlot.limpeza ?? []), 'ácido salicílico', 'antiacne'];
+    perSlot.serum_creme = [...(perSlot.serum_creme ?? []), 'ácido salicílico', 'niacinamida'];
+    perSlot.protetor_solar = [...(perSlot.protetor_solar ?? []), 'oil free', 'antiacne'];
+  }
+
+  return { all, perSlot };
+}
+
 // Palavras-chave que descrevem o perfil de pele em termos de produto cosmético.
 // Inseridas na query de embedding pra direcionar a busca pra produtos compatíveis.
 function diagnosisKeywords(d: SkinDiagnosis): string[] {
@@ -209,11 +260,14 @@ export async function montarProtocolo(
   let catalogSourceId: string | null = null;
   const faltandoEssenciais: string[] = [];
 
-  // Inclui o desejo do usuario no contexto da busca (ex: "reduzir manchas")
+  // Mapeia os objetivos do lead em keywords (gerais + por slot) pra direcionar a busca.
+  const desires = desiresKeywords(desejaMelhorar);
   const desejoCtx = desejaMelhorar.trim() ? `Objetivo: ${desejaMelhorar.trim()}.` : '';
 
   for (const slot of SLOTS) {
-    const query = `${slotQueryForDiagnosis(slot, diagnosis)} ${desejoCtx}`.trim();
+    const slotBoost = (desires.perSlot[slot.id] ?? []).join(' ');
+    const globalBoost = desires.all.join(' ');
+    const query = `${slotQueryForDiagnosis(slot, diagnosis)} ${slotBoost} ${globalBoost} ${desejoCtx}`.trim().replace(/\s+/g, ' ');
     const { product, sourceId } = await searchProductsForSlot(query, diagnosis, clinicId);
     if (sourceId) catalogSourceId = sourceId;
     if (product) {

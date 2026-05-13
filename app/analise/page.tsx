@@ -118,6 +118,18 @@ function CornerBrackets({ lit }: { lit: boolean }) {
   );
 }
 
+// Opções de desejos: usado tanto no form quanto no backend p/ enriquecer a busca de produtos.
+const DESEJOS_OPCOES = [
+  'Tratar Manchas',
+  'Tratar Rugas e Linhas de Expressão',
+  'Controle da Oleosidade',
+  'Reduzir Poros Dilatados',
+  'Clarear e Uniformizar o Tom',
+  'Hidratar Pele Seca ou Ressecada',
+  'Tratar Acne e Espinhas',
+  'Lifting e Firmeza',
+] as const;
+
 // ── Icon helpers ──────────────────────────────────────────────────────
 const Ic = {
   User:  () => <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M20 21a8 8 0 1 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>,
@@ -163,7 +175,7 @@ function AnalisePage() {
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [telefone, setTelefone] = useState('');
-  const [desejos, setDesejos] = useState('');
+  const [desejos, setDesejos] = useState<string[]>([]);
   const [formBusy, setFormBusy] = useState(false);
 
   // Camera
@@ -286,8 +298,10 @@ function AnalisePage() {
   const submitForm = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!nome.trim() || !email.trim() || !telefone.trim() || !desejos.trim()) {
-      setError('Preencha todos os campos.');
+    if (!nome.trim() || !email.trim() || !telefone.trim() || desejos.length === 0) {
+      setError(desejos.length === 0 && nome && email && telefone
+        ? 'Selecione pelo menos um objetivo de tratamento.'
+        : 'Preencha todos os campos.');
       return;
     }
     setFormBusy(true);
@@ -295,7 +309,7 @@ function AnalisePage() {
       const res = await fetch(apiUrl('/leads'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nome, email, telefone, desejaMelhorar: desejos, tokenSlug }),
+        body: JSON.stringify({ nome, email, telefone, desejaMelhorar: desejos.join(', '), tokenSlug }),
       });
       const data = await res.json() as { id?: string; nome?: string; analysisToken?: string; message?: string };
       if (!res.ok) { setError(data.message ?? 'Erro ao registrar.'); return; }
@@ -466,7 +480,32 @@ function AnalisePage() {
               <Field id="nome" label="Nome completo" type="text" ph="Maria Silva" val={nome} set={setNome} Icon={Ic.User} />
               <Field id="email" label="E-mail" type="email" ph="seu@email.com" val={email} set={setEmail} Icon={Ic.Mail} />
               <Field id="tel" label="Telefone / WhatsApp" type="tel" ph="(11) 99999-9999" val={telefone} set={setTelefone} Icon={Ic.Phone} />
-              <Field id="desejos" label="O que deseja melhorar na sua pele?" type="text" ph="Ex: reduzir manchas, controlar acne..." val={desejos} set={setDesejos} Icon={Ic.Sparkle} textarea />
+              <div>
+                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8b3f5a]">
+                  O que deseja melhorar na sua pele?
+                </label>
+                <p className="mb-2 text-[11px] text-[#b8a0ac]">Selecione um ou mais objetivos</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {DESEJOS_OPCOES.map((opt) => {
+                    const checked = desejos.includes(opt);
+                    return (
+                      <label key={opt}
+                        className={`flex cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-2.5 text-[12px] leading-tight transition-all ${
+                          checked
+                            ? 'border-[#b96f8d] bg-[#fdf4f8] text-[#4a2435]'
+                            : 'border-[#e8d0db] bg-white text-[#7a4f60] hover:border-[#dfc8d4]'
+                        }`}>
+                        <input type="checkbox" checked={checked}
+                          onChange={() => setDesejos((prev) =>
+                            prev.includes(opt) ? prev.filter((x) => x !== opt) : [...prev, opt]
+                          )}
+                          className="h-3.5 w-3.5 flex-shrink-0 accent-[#b96f8d]" />
+                        <span>{opt}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
 
               {error && (
                 <div className="flex gap-3 rounded-xl border border-red-100 bg-red-50/90 px-4 py-3">

@@ -100,8 +100,28 @@ function passo(numero: number, s: SlotProduto): string {
   `;
 }
 
+type DiagDetalhes = {
+  nivelOleosidade: string;
+  nivelAcne: string;
+  nivelSensibilidade: string;
+  observacoes: string;
+};
+
+function metricaPill(label: string, valor: string): string {
+  return `
+    <td valign="top" style="padding:0 4px;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${C.borderSoft};border-radius:6px;background:${C.white};">
+        <tr><td style="padding:12px 14px;text-align:center;">
+          <p style="margin:0 0 4px;font-family:${FONT_SANS};font-size:9px;letter-spacing:0.2em;color:${C.gold};text-transform:uppercase;font-weight:600;">${escapeHtml(label)}</p>
+          <p style="margin:0;font-family:${FONT_SERIF};font-size:15px;color:${C.navyDeep};line-height:1.2;">${escapeHtml(valor)}</p>
+        </td></tr>
+      </table>
+    </td>
+  `;
+}
+
 // 01 · Capa + Boas-vindas + Diagnóstico
-function secaoBoasVindas(nome: string, queixa: string, foco: string, estrategia: string, tipoPele: string): string {
+function secaoBoasVindas(nome: string, queixa: string, foco: string, estrategia: string, tipoPele: string, det: DiagDetalhes): string {
   return `
     <!-- COVER STRIP -->
     <tr><td style="background:${C.navyDeep};padding:60px 48px 48px;text-align:center;">
@@ -162,6 +182,23 @@ function secaoBoasVindas(nome: string, queixa: string, foco: string, estrategia:
           </td>
         </tr>
       </table>
+
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;">
+        <tr>
+          ${metricaPill('Oleosidade', det.nivelOleosidade)}
+          ${metricaPill('Acne', det.nivelAcne)}
+          ${metricaPill('Sensibilidade', det.nivelSensibilidade)}
+        </tr>
+      </table>
+
+      ${det.observacoes && det.observacoes.trim() ? `
+        <h3 style="margin:30px 0 8px;font-family:${FONT_SERIF};font-weight:400;font-size:20px;color:${C.navyDeep};">O que observamos na sua pele</h3>
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:${C.creamLight};border-left:3px solid ${C.gold};border-radius:0 6px 6px 0;">
+          <tr><td style="padding:18px 22px;">
+            <p style="margin:0;font-family:${FONT_SERIF};font-style:italic;font-size:14px;color:${C.navyText};line-height:1.75;">${escapeHtml(det.observacoes)}</p>
+          </td></tr>
+        </table>
+      ` : ''}
 
       <h3 style="margin:30px 0 8px;font-family:${FONT_SERIF};font-weight:400;font-size:20px;color:${C.navyDeep};">Estratégia de tratamento</h3>
       <p style="margin:0 0 12px;font-family:${FONT_SANS};font-size:13px;color:${C.navyText};line-height:1.75;">${escapeHtml(estrategia)}</p>
@@ -378,7 +415,12 @@ export function renderProtocoloEmail(
 <tr><td align="center">
 <table width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:${C.white};box-shadow:0 8px 40px rgba(26,58,95,.12);">
 
-  ${secaoBoasVindas(nome, p.queixaPrincipal, p.focoProtocolo, p.estrategia, resultado.tipoPele)}
+  ${secaoBoasVindas(nome, p.queixaPrincipal, p.focoProtocolo, p.estrategia, resultado.tipoPele, {
+    nivelOleosidade: resultado.nivelOleosidade,
+    nivelAcne: resultado.nivelAcne,
+    nivelSensibilidade: resultado.nivelSensibilidade,
+    observacoes: resultado.observacoes,
+  })}
   ${secaoRotinaManha(map)}
   ${secaoRotinaNoiteAtivo(map)}
   ${secaoRotinaNoiteNutricao(map)}
