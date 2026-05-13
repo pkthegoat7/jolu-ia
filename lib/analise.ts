@@ -2,7 +2,8 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
 import sharp from 'sharp';
 import { createClient } from '@supabase/supabase-js';
-import { searchProducts, type SkinDiagnosis } from './catalog';
+import type { SkinDiagnosis } from './catalog';
+import { montarProtocolo, type ProtocoloPersonalizado } from './protocolo';
 
 type Landmark = { x: number; y: number; z: number };
 
@@ -23,6 +24,8 @@ export type ResultadoAnalise = {
   nivelAcne: string;
   nivelSensibilidade: string;
   observacoes: string;
+  protocolo: ProtocoloPersonalizado;
+  // Derivado de protocolo.slots — mantido pra retrocompat com UI admin existente.
   recomendacoes: Recomendacao[];
   catalogSourceId?: string | null;
   modoFallback?: boolean;
@@ -193,108 +196,13 @@ async function analisarComGroq(base64Image: string): Promise<Record<string, stri
   }
 }
 
-function recomendacoesFallback(tipoPele: string) {
-  const mapa: Record<string, { nome: string; motivo: string; modoDeUso: string }[]> = {
-    Oleosa: [
-      {
-        nome: 'Patricia Elias Gel de Limpeza Purificante',
-        motivo: 'Ajuda a controlar brilho excessivo sem ressecar a pele.',
-        modoDeUso: 'Aplicar de manha e a noite com movimentos circulares.',
-      },
-      {
-        nome: 'Patricia Elias Serum Controle de Acne',
-        motivo: 'Formula direcionada para reduzir inflamacao e obstrucao dos poros.',
-        modoDeUso: 'Usar a noite, apos limpeza e antes do hidratante.',
-      },
-      {
-        nome: 'Patricia Elias Protetor Solar Oil Free FPS 60',
-        motivo: 'Protege contra UV sem aumentar a oleosidade.',
-        modoDeUso: 'Aplicar pela manha e reaplicar a cada 3 horas.',
-      },
-    ],
-    Mista: [
-      {
-        nome: 'Patricia Elias Espuma de Limpeza Equilibrante',
-        motivo: 'Equilibra zonas secas e oleosas do rosto.',
-        modoDeUso: 'Usar 2 vezes ao dia com enxague abundante.',
-      },
-      {
-        nome: 'Patricia Elias Serum Hidra-Repair',
-        motivo: 'Mantem hidratacao sem pesar na zona T.',
-        modoDeUso: 'Aplicar 4 gotas de manha e a noite.',
-      },
-      {
-        nome: 'Patricia Elias Protetor Solar Toque Seco FPS 50',
-        motivo: 'Protecao diaria com acabamento confortavel.',
-        modoDeUso: 'Aplicar de forma uniforme antes da exposicao solar.',
-      },
-    ],
-    'Seca/Sensivel': [
-      {
-        nome: 'Patricia Elias Leite de Limpeza Calmante',
-        motivo: 'Limpeza suave para pele sensibilizada.',
-        modoDeUso: 'Aplicar com algodao sem friccao excessiva.',
-      },
-      {
-        nome: 'Patricia Elias Creme Reparador de Barreira',
-        motivo: 'Fortalece a barreira cutanea e reduz desconforto.',
-        modoDeUso: 'Aplicar 2 vezes ao dia apos limpeza.',
-      },
-      {
-        nome: 'Patricia Elias Protetor Solar Mineral FPS 50',
-        motivo: 'Protecao com menor risco de irritacao.',
-        modoDeUso: 'Aplicar pela manha e reaplicar ao longo do dia.',
-      },
-    ],
-  };
-  return mapa[tipoPele] ?? mapa['Mista'];
-}
-
-async function recomendacoesPara(
-  profile: SkinDiagnosis,
-  clinicId: string,
-): Promise<{ items: Recomendacao[]; sourceId: string | null }> {
-  try {
-    const { products, sourceId } = await searchProducts(profile, clinicId, 3);
-    if (products.length > 0) {
-      return {
-        sourceId,
-        items: products.map((p) => ({
-          nome: p.nome,
-          motivo: [p.tipo, p.categorias].filter(Boolean).join(' · '),
-          modoDeUso: 'Consulte as instruções de uso na embalagem do produto.',
-          link: p.link,
-          precoPromocional: p.precoPromocional,
-          precoNormal: p.precoNormal,
-          marca: p.marca,
-        })),
-      };
-    }
-  } catch (err) {
-    console.error('[recomendacoes] busca vetorial falhou, usando fallback:', err instanceof Error ? err.message : err);
-  }
-  return { items: recomendacoesFallback(profile.tipoPele), sourceId: null };
-}
-
-async function fallbackPorBuffer(clinicId: string): Promise<ResultadoAnalise> {
-  const tipoPele = 'Mista';
-  const nivelOleosidade = 'Media';
-  const nivelAcne = 'Leve';
-  const nivelSensibilidade = 'Media';
-  const recs = await recomendacoesPara(
-    { tipoPele, nivelOleosidade, nivelAcne, nivelSensibilidade, observacoes: '' },
-    clinicId,
-  );
+async function profileFromBuffer(): Promise<SkinDiagnosis> {
   return {
-    status: 'Concluido',
-    tipoPele,
-    nivelOleosidade,
-    nivelAcne,
-    nivelSensibilidade,
+    tipoPele: 'Mista',
+    nivelOleosidade: 'Media',
+    nivelAcne: 'Leve',
+    nivelSensibilidade: 'Media',
     observacoes: 'Análise estimada — serviço de IA indisponível no momento.',
-    recomendacoes: recs.items,
-    catalogSourceId: recs.sourceId,
-    modoFallback: true,
   };
 }
 
@@ -302,6 +210,7 @@ export async function analisarImagem(
   imageBuffer: Buffer,
   landmarks: Landmark[] | null,
   clinicId: string,
+  desejaMelhorar: string,
 ): Promise<ResultadoAnalise> {
   let faceBuffer = imageBuffer;
   if (landmarks) {
@@ -311,33 +220,47 @@ export async function analisarImagem(
   const base64Image = faceBuffer.toString('base64');
 
   // Cascata gratuita: tenta Gemini primeiro, cai pro Groq se falhar.
-  // Ambos no free tier — sem custo por análise.
   let parsed = await analisarComGemini(base64Image);
   if (!parsed) {
     console.log('[analise] Gemini falhou, tentando fallback Groq');
     parsed = await analisarComGroq(base64Image);
   }
 
-  if (!parsed) return fallbackPorBuffer(clinicId);
+  const fallback = !parsed;
+  const profile: SkinDiagnosis = parsed
+    ? {
+        tipoPele: parsed.tipoPele ?? 'Mista',
+        nivelOleosidade: parsed.nivelOleosidade ?? 'Media',
+        nivelAcne: parsed.nivelAcne ?? 'Leve',
+        nivelSensibilidade: parsed.nivelSensibilidade ?? 'Media',
+        observacoes: parsed.observacoes ?? '',
+      }
+    : await profileFromBuffer();
 
-  const tipoPele = parsed.tipoPele ?? 'Mista';
-  const nivelOleosidade = parsed.nivelOleosidade ?? 'Media';
-  const nivelAcne = parsed.nivelAcne ?? 'Leve';
-  const nivelSensibilidade = parsed.nivelSensibilidade ?? 'Media';
-  const observacoes = parsed.observacoes ?? '';
-  const recs = await recomendacoesPara(
-    { tipoPele, nivelOleosidade, nivelAcne, nivelSensibilidade, observacoes },
-    clinicId,
-  );
+  // Pode lançar se catálogo não tiver os essenciais — propaga pro caller.
+  const protocolo = await montarProtocolo(profile, desejaMelhorar, clinicId);
+
+  const recomendacoes: Recomendacao[] = protocolo.slots.map((s) => ({
+    nome: s.produto.nome,
+    motivo: [s.produto.tipo, s.produto.categorias].filter(Boolean).join(' · '),
+    modoDeUso: s.slot.comoUsar,
+    link: s.produto.link,
+    precoPromocional: s.produto.precoPromocional,
+    precoNormal: s.produto.precoNormal,
+    marca: s.produto.marca,
+  }));
+
   return {
     status: 'Concluido',
-    tipoPele,
-    nivelOleosidade,
-    nivelAcne,
-    nivelSensibilidade,
-    observacoes,
-    recomendacoes: recs.items,
-    catalogSourceId: recs.sourceId,
+    tipoPele: profile.tipoPele,
+    nivelOleosidade: profile.nivelOleosidade,
+    nivelAcne: profile.nivelAcne,
+    nivelSensibilidade: profile.nivelSensibilidade,
+    observacoes: profile.observacoes,
+    protocolo,
+    recomendacoes,
+    catalogSourceId: protocolo.catalogSourceId,
+    modoFallback: fallback,
   };
 }
 

@@ -10,10 +10,21 @@ type GuidanceStatus = 'waiting' | 'warn' | 'ok';
 type GuidanceArrow = 'up' | 'down' | 'left' | 'right' | 'in' | 'out' | null;
 type Guidance = { message: string; status: GuidanceStatus; arrow: GuidanceArrow };
 
-function computeGuidance(lm: Array<{ x: number; y: number; z: number }> | null): Guidance {
-  const waiting: Guidance = { message: 'Posicione seu rosto na câmera', status: 'waiting', arrow: null };
-  if (!lm || lm.length < 454) return waiting;
+type Pose = { yaw: number; pitch: number; roll: number; faceHeight: number; cx: number; cy: number };
+type Landmark = { x: number; y: number; z: number };
 
+// Ângulos do liveness — ordem de captura. Frontal sempre primeiro (é o que vai pra IA).
+type AnguloId = 'frente' | 'esquerda' | 'direita' | 'cima' | 'baixo';
+const ANGULOS: { id: AnguloId; label: string; instr: string; arrow: GuidanceArrow }[] = [
+  { id: 'frente',    label: 'Frente',    instr: 'Olhe direto para a câmera',         arrow: null  },
+  { id: 'esquerda',  label: 'Esquerda',  instr: 'Vire o rosto lentamente p/ esquerda', arrow: 'left'  },
+  { id: 'direita',   label: 'Direita',   instr: 'Agora vire para a direita',         arrow: 'right' },
+  { id: 'cima',      label: 'Cima',      instr: 'Levante levemente o queixo',        arrow: 'up'    },
+  { id: 'baixo',     label: 'Baixo',     instr: 'Abaixe levemente o queixo',         arrow: 'down'  },
+];
+
+function computePose(lm: Landmark[] | null): Pose | null {
+  if (!lm || lm.length < 454) return null;
   const nose     = lm[4];
   const forehead = lm[10];
   const chin     = lm[152];
@@ -21,19 +32,36 @@ function computeGuidance(lm: Array<{ x: number; y: number; z: number }> | null):
   const rightEye = lm[263];
 
   const faceHeight = Math.abs(chin.y - forehead.y);
-  const cx = nose.x;
-  const cy = nose.y;
-  const tilt = Math.abs(Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x) * (180 / Math.PI));
+  const eyeMidX = (leftEye.x + rightEye.x) / 2;
+  const eyeMidY = (leftEye.y + rightEye.y) / 2;
+  // Yaw: deslocamento horizontal do nariz em relação ao centro entre os olhos, normalizado pela largura do par de olhos.
+  const eyeWidth = Math.abs(rightEye.x - leftEye.x) || 1;
+  const yaw = (nose.x - eyeMidX) / eyeWidth;
+  // Pitch: deslocamento vertical do nariz em relação à linha dos olhos, normalizado pela altura do rosto.
+  const pitch = (nose.y - eyeMidY) / (faceHeight || 1);
+  const roll = Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x) * (180 / Math.PI);
+  return { yaw, pitch, roll, faceHeight, cx: nose.x, cy: nose.y };
+}
 
-  if (faceHeight < 0.22) return { message: 'Aproxime o rosto da câmera', status: 'warn', arrow: 'in' };
-  if (faceHeight > 0.72) return { message: 'Afaste o rosto da câmera',   status: 'warn', arrow: 'out' };
-  if (cx < 0.37)         return { message: 'Mova o rosto para a direita', status: 'warn', arrow: 'right' };
-  if (cx > 0.63)         return { message: 'Mova o rosto para a esquerda',status: 'warn', arrow: 'left' };
-  if (cy < 0.28)         return { message: 'Abaixe levemente o rosto',    status: 'warn', arrow: 'down' };
-  if (cy > 0.68)         return { message: 'Levante levemente o rosto',   status: 'warn', arrow: 'up' };
-  if (tilt > 12)         return { message: 'Endireite levemente a cabeça', status: 'warn', arrow: null };
+// Posicionamento básico (face centralizada, distância OK) — pré-requisito antes de qualquer ângulo.
+function checkFraming(p: Pose): Guidance | null {
+  if (p.faceHeight < 0.22) return { message: 'Aproxime o rosto da câmera', status: 'warn', arrow: 'in' };
+  if (p.faceHeight > 0.72) return { message: 'Afaste o rosto da câmera',   status: 'warn', arrow: 'out' };
+  if (Math.abs(p.roll) > 14) return { message: 'Endireite levemente a cabeça', status: 'warn', arrow: null };
+  return null;
+}
 
-  return { message: 'Perfeito! Clique em Analisar', status: 'ok', arrow: null };
+// Verifica se a pose atual corresponde ao ângulo alvo. Tolerâncias geram a "zona certa".
+function matchesAngle(p: Pose, target: AnguloId): boolean {
+  const YAW_FRENTE = 0.12, YAW_LADO = 0.32;
+  const PITCH_FRENTE = 0.05, PITCH_VERT = 0.10;
+  switch (target) {
+    case 'frente':   return Math.abs(p.yaw) < YAW_FRENTE && Math.abs(p.pitch) < PITCH_FRENTE + 0.05;
+    case 'esquerda': return p.yaw > YAW_LADO;
+    case 'direita':  return p.yaw < -YAW_LADO;
+    case 'cima':     return p.pitch < -PITCH_VERT;
+    case 'baixo':    return p.pitch > PITCH_VERT;
+  }
 }
 
 // ── Guidance Overlay ──────────────────────────────────────────────────
@@ -160,14 +188,29 @@ function AnalisePage() {
   const sharpVideoRef = useRef<HTMLVideoElement>(null);
   const canvasRef     = useRef<HTMLCanvasElement>(null);
   const [camOn, setCamOn] = useState(false);
-  const [faceDet, setFaceDet] = useState(false);
+  const [, setFaceDet] = useState(false);
   const [meshReady, setMeshReady] = useState(false);
   const [scanStatus, setScanStatus] = useState('');
   const [guidance, setGuidance] = useState<Guidance>({ message: 'Posicione seu rosto na câmera', status: 'waiting', arrow: null });
-  const [faceReady, setFaceReady] = useState(false);
   const [blurBg, setBlurBg] = useState('');
-  const okFramesRef = useRef(0);
   const blurIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ── Liveness multi-ângulo ──
+  const [scanRunning, setScanRunning] = useState(false);
+  const [anguloIdx, setAnguloIdx] = useState(0);                  // qual ângulo estamos pedindo
+  const [capturados, setCapturados] = useState<Record<AnguloId, Blob | null>>({
+    frente: null, esquerda: null, direita: null, cima: null, baixo: null,
+  });
+  const okFramesRef = useRef(0);
+  const scanRunningRef = useRef(false);
+  const anguloIdxRef = useRef(0);
+  const capturadosRef = useRef<Record<AnguloId, Blob | null>>({
+    frente: null, esquerda: null, direita: null, cima: null, baixo: null,
+  });
+  // Anti-spoof: registra histograma de yaw/pitch ao longo do scan — se nunca variou, é foto.
+  const poseHistoryRef = useRef<{ yaw: number; pitch: number }[]>([]);
+  // Trampolim para chamar enviarAnalise dentro de onLandmarks sem ciclo de declaração.
+  const enviarAnaliseRef = useRef<() => void>(() => {});
 
   const captureBlurFrame = useCallback(() => {
     const video = videoRef.current;
@@ -184,18 +227,85 @@ function AnalisePage() {
     setBlurBg(c.toDataURL('image/jpeg', 0.7));
   }, []);
 
+  // Captura frame atual do vídeo como Blob JPEG (resolução cheia).
+  const captureFrameBlob = useCallback((): Promise<Blob | null> => {
+    return new Promise((resolve) => {
+      const video = videoRef.current;
+      if (!video || !video.videoWidth) return resolve(null);
+      const c = document.createElement('canvas');
+      c.width = video.videoWidth;
+      c.height = video.videoHeight;
+      const ctx = c.getContext('2d');
+      if (!ctx) return resolve(null);
+      ctx.drawImage(video, 0, 0);
+      c.toBlob((b) => resolve(b), 'image/jpeg', 0.9);
+    });
+  }, []);
+
   const onFace = useCallback((d: boolean) => setFaceDet(d), []);
-  const onLandmarks = useCallback((lm: Array<{ x: number; y: number; z: number }> | null) => {
-    const g = computeGuidance(lm);
-    setGuidance(g);
-    if (g.status === 'ok') {
+  const onLandmarks = useCallback((lm: Landmark[] | null) => {
+    const pose = computePose(lm);
+    if (!pose) {
+      setGuidance({ message: 'Posicione seu rosto na câmera', status: 'waiting', arrow: null });
+      okFramesRef.current = 0;
+      return;
+    }
+
+    poseHistoryRef.current.push({ yaw: pose.yaw, pitch: pose.pitch });
+    if (poseHistoryRef.current.length > 200) poseHistoryRef.current.shift();
+
+    const framingErr = checkFraming(pose);
+    if (framingErr) {
+      setGuidance(framingErr);
+      okFramesRef.current = 0;
+      return;
+    }
+
+    if (!scanRunningRef.current) {
+      // Modo aguardando — só checa enquadramento.
+      setGuidance({ message: 'Pronto. Clique em "Iniciar Escaneamento" quando estiver à vontade', status: 'ok', arrow: null });
+      okFramesRef.current = 0;
+      return;
+    }
+
+    const target = ANGULOS[anguloIdxRef.current];
+    if (!target) return;
+
+    if (matchesAngle(pose, target.id)) {
       okFramesRef.current += 1;
-      if (okFramesRef.current >= 10) setFaceReady(true);
+      setGuidance({ message: `Segura assim... (${target.label})`, status: 'ok', arrow: null });
+      // Precisa segurar a pose ~8 frames (~0.5s a 15fps) para considerar estável.
+      if (okFramesRef.current >= 8 && !capturadosRef.current[target.id]) {
+        // Marca já pra evitar dupla captura na próxima animação.
+        capturadosRef.current[target.id] = new Blob();
+        captureFrameBlob().then((blob) => {
+          if (!blob) {
+            capturadosRef.current[target.id] = null;
+            return;
+          }
+          capturadosRef.current[target.id] = blob;
+          setCapturados({ ...capturadosRef.current });
+          okFramesRef.current = 0;
+          // Avança ângulo
+          const next = anguloIdxRef.current + 1;
+          if (next < ANGULOS.length) {
+            anguloIdxRef.current = next;
+            setAnguloIdx(next);
+          } else {
+            // Todos capturados — dispara envio.
+            scanRunningRef.current = false;
+            setScanRunning(false);
+            enviarAnaliseRef.current();
+          }
+        });
+      }
     } else {
       okFramesRef.current = 0;
-      setFaceReady(false);
+      setGuidance({ message: target.instr, status: 'warn', arrow: target.arrow });
     }
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [captureFrameBlob]);
+
   const { start: startMesh, stop: stopMesh, getLandmarks } = useFaceMesh(videoRef, canvasRef, onFace, onLandmarks);
 
   useEffect(() => () => { if (blurIntervalRef.current) clearInterval(blurIntervalRef.current); }, []);
@@ -247,7 +357,8 @@ function AnalisePage() {
         videoRef.current.srcObject = stream;
         if (sharpVideoRef.current) sharpVideoRef.current.srcObject = stream;
         setCamOn(true);
-        setFaceReady(false);
+        scanRunningRef.current = false;
+        setScanRunning(false);
         okFramesRef.current = 0;
         setGuidance({ message: 'Posicione seu rosto na câmera', status: 'waiting', arrow: null });
         setBlurBg('');
@@ -264,42 +375,68 @@ function AnalisePage() {
     }
   };
 
-  const analisar = async () => {
-    const video = videoRef.current;
-    if (!video || !video.videoWidth) { setScanStatus('Câmera não detectada.'); return; }
+  const iniciarScan = () => {
+    // Reset state e arranca a coleta a partir do ângulo "frente".
+    capturadosRef.current = { frente: null, esquerda: null, direita: null, cima: null, baixo: null };
+    setCapturados({ ...capturadosRef.current });
+    anguloIdxRef.current = 0;
+    setAnguloIdx(0);
+    okFramesRef.current = 0;
+    poseHistoryRef.current = [];
+    scanRunningRef.current = true;
+    setScanRunning(true);
+    setScanStatus('');
+  };
+
+  const enviarAnalise: () => Promise<void> = async () => {
+    // Anti-spoof: variação mínima de yaw entre captures (foto retornaria ~0).
+    const yaws = poseHistoryRef.current.map((p) => p.yaw);
+    const range = Math.max(...yaws) - Math.min(...yaws);
+    if (range < 0.3) {
+      scanRunningRef.current = false;
+      setScanRunning(false);
+      setScanStatus('Não detectamos movimento real do rosto. Tente novamente.');
+      return;
+    }
+
+    const frente = capturadosRef.current.frente;
+    if (!frente) {
+      setScanStatus('Frame frontal ausente. Reinicie o escaneamento.');
+      return;
+    }
+
     setStep('processing');
     stopMesh();
 
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) { setStep('scan'); return; }
-    ctx.drawImage(video, 0, 0);
+    const fd = new FormData();
+    fd.append('image_front', frente, 'scan-frente.jpg');
+    // Compat: o backend ainda lê 'image' como fallback.
+    fd.append('image', frente, 'scan.jpg');
+    for (const ang of ['esquerda','direita','cima','baixo'] as AnguloId[]) {
+      const blob = capturadosRef.current[ang];
+      if (blob) fd.append(`image_${ang}`, blob, `scan-${ang}.jpg`);
+    }
+    fd.append('analysisToken', analysisToken);
+    const lm = getLandmarks();
+    if (lm) fd.append('landmarks', JSON.stringify(lm));
 
-    canvas.toBlob(async (blob) => {
-      if (!blob) { setStep('scan'); return; }
-      const fd = new FormData();
-      fd.append('image', blob, 'scan.jpg');
-      fd.append('analysisToken', analysisToken);
-      const lm = getLandmarks();
-      if (lm) fd.append('landmarks', JSON.stringify(lm));
-      try {
-        const res = await fetch(apiUrl(`/leads/${leadId}/analise`), { method: 'POST', body: fd });
-        if (res.ok) {
-          router.push('/obrigado');
-        } else {
-          setStep('scan');
-          setScanStatus('Erro na análise. Tente novamente.');
-          startMesh();
-        }
-      } catch {
+    try {
+      const res = await fetch(apiUrl(`/leads/${leadId}/analise`), { method: 'POST', body: fd });
+      if (res.ok) {
+        router.push('/obrigado');
+      } else {
+        const data = await res.json().catch(() => ({}));
         setStep('scan');
-        setScanStatus('Erro ao conectar. Tente novamente.');
+        setScanStatus(data?.message ?? 'Erro na análise. Tente novamente.');
         startMesh();
       }
-    }, 'image/jpeg', 0.9);
+    } catch {
+      setStep('scan');
+      setScanStatus('Erro ao conectar. Tente novamente.');
+      startMesh();
+    }
   };
+  enviarAnaliseRef.current = () => { void enviarAnalise(); };
 
   // ── Render: validating ────────────────────────────────────────────
   if (step === 'validating') {
@@ -432,14 +569,40 @@ function AnalisePage() {
 
         {/* Heading */}
         <div className="fu w-full">
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-[#b96f8d]">Escaneamento Facial</p>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-[#b96f8d]">Escaneamento Facial · Liveness</p>
           <h2 className="font-display text-[2rem] font-light text-[#4a2435] leading-tight">
-            Posicione seu rosto <span style={{ fontStyle: 'italic', color: '#7a3f56' }}>no centro</span>.
+            {scanRunning
+              ? <>Vire o rosto <span style={{ fontStyle: 'italic', color: '#7a3f56' }}>devagar</span>.</>
+              : <>Posicione seu rosto <span style={{ fontStyle: 'italic', color: '#7a3f56' }}>no centro</span>.</>}
           </h2>
           <p className="mt-1 text-sm text-[#9a7282]">
-            Face Mesh com 468 pontos analisa sua pele em tempo real.
+            {scanRunning
+              ? 'O sistema captura sozinho conforme você gira o rosto. Não precisa clicar.'
+              : 'Quando estiver pronta, clique para iniciar o escaneamento de prova de vida.'}
           </p>
         </div>
+
+        {/* Progress dots — só aparece durante o scan */}
+        {scanRunning && (
+          <div className="w-full flex items-center justify-center gap-3 py-1">
+            {ANGULOS.map((a, i) => {
+              const done = !!capturados[a.id];
+              const active = i === anguloIdx && !done;
+              return (
+                <div key={a.id} className="flex flex-col items-center gap-1.5">
+                  <div className={`h-3 w-3 rounded-full transition-all duration-300 ${
+                    done ? 'bg-emerald-500 scale-110'
+                      : active ? 'bg-[#b96f8d] ring-4 ring-[#b96f8d]/25 animate-pulse'
+                      : 'bg-[#e8d0db]'
+                  }`} />
+                  <span className={`text-[9px] font-semibold uppercase tracking-wider ${
+                    done ? 'text-emerald-600' : active ? 'text-[#7a3f56]' : 'text-[#c4a0b8]'
+                  }`}>{a.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Camera box */}
         <div className="fu1 w-full relative rounded-2xl overflow-hidden"
@@ -458,7 +621,7 @@ function AnalisePage() {
                 className="absolute inset-0 h-full w-full object-cover pointer-events-none"
                 style={{ clipPath: 'ellipse(24% 42.7% at 50% 49.3%)' }} />
               <canvas ref={canvasRef} className="absolute inset-0 h-full w-full pointer-events-none" />
-              <CornerBrackets lit={faceReady} />
+              <CornerBrackets lit={guidance.status === 'ok'} />
               <GuidanceOverlay guidance={guidance} camOn={camOn} />
 
               {meshReady && (
@@ -499,9 +662,9 @@ function AnalisePage() {
             className="btn-ghost flex-1 rounded-2xl py-3.5 text-sm font-semibold">
             {camOn ? 'Reiniciar' : 'Ligar Câmera'}
           </button>
-          <button onClick={analisar} disabled={!camOn || !faceReady}
+          <button onClick={iniciarScan} disabled={!camOn || scanRunning || guidance.status !== 'ok'}
             className="btn-brand flex-[2] rounded-2xl py-3.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50">
-            Analisar Pele →
+            {scanRunning ? 'Escaneando…' : 'Iniciar Escaneamento →'}
           </button>
         </div>
 

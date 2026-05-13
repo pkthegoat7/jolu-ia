@@ -20,6 +20,7 @@ export type ProductRecommendation = {
 
 export interface CatalogAdapter {
   searchProducts(diagnosis: SkinDiagnosis, limit: number): Promise<ProductRecommendation[]>;
+  searchProductsForSlot?(slotQuery: string, diagnosis: SkinDiagnosis, limit: number): Promise<ProductRecommendation[]>;
 }
 
 export type SearchProductsResult = {

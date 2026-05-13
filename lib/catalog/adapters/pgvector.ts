@@ -62,21 +62,22 @@ function getTableName(envPrefix: string): string {
   return t;
 }
 
-async function embedDiagnosis(diagnosis: SkinDiagnosis): Promise<number[] | null> {
-  const client = getOpenAI();
-  if (!client) {
-    console.warn('[pgvector] OPENAI_API_KEY não definida');
-    return null;
-  }
-
-  const text = [
+function diagnosisAsText(diagnosis: SkinDiagnosis): string {
+  return [
     `Tipo de pele: ${diagnosis.tipoPele}`,
     `Nível de oleosidade: ${diagnosis.nivelOleosidade}`,
     `Nível de acne: ${diagnosis.nivelAcne}`,
     `Sensibilidade: ${diagnosis.nivelSensibilidade}`,
     `Observações: ${diagnosis.observacoes}`,
   ].join('\n');
+}
 
+async function embedText(text: string): Promise<number[] | null> {
+  const client = getOpenAI();
+  if (!client) {
+    console.warn('[pgvector] OPENAI_API_KEY não definida');
+    return null;
+  }
   const res = await client.embeddings.create({
     model: 'text-embedding-3-small',
     input: text,
@@ -85,50 +86,65 @@ async function embedDiagnosis(diagnosis: SkinDiagnosis): Promise<number[] | null
   return res.data[0]?.embedding ?? null;
 }
 
+async function queryByEmbedding(
+  envPrefix: string,
+  embedding: number[],
+  limit: number,
+): Promise<ProductRecommendation[]> {
+  const p = getPool(envPrefix);
+  if (!p) {
+    console.warn(`[pgvector:${envPrefix}] credenciais não configuradas`);
+    return [];
+  }
+  const vectorLiteral = `[${embedding.join(',')}]`;
+  const table = getTableName(envPrefix);
+
+  const { rows } = await p.query(
+    `SELECT
+       id,
+       metadata->>'nome_produto' AS nome,
+       metadata->>'tipo_produto' AS tipo,
+       metadata->>'categorias' AS categorias,
+       metadata->>'marca' AS marca,
+       (metadata->>'preco_promocional')::numeric AS preco_promocional,
+       (metadata->>'preco_normal')::numeric AS preco_normal,
+       metadata->>'link_produto' AS link,
+       1 - (embedding <=> $1::vector) AS similarity
+     FROM "${table}"
+     WHERE metadata->>'situacao' = 'Ativo'
+     ORDER BY embedding <=> $1::vector ASC
+     LIMIT $2`,
+    [vectorLiteral, limit],
+  );
+
+  return rows.map((r) => ({
+    id: r.id,
+    nome: r.nome,
+    tipo: r.tipo,
+    categorias: r.categorias,
+    marca: r.marca,
+    precoPromocional: Number(r.preco_promocional),
+    precoNormal: Number(r.preco_normal),
+    link: r.link,
+    similarity: Number(r.similarity),
+  }));
+}
+
 export function makePgVectorAdapter(envPrefix: string): CatalogAdapter {
   return {
-    async searchProducts(diagnosis: SkinDiagnosis, limit: number): Promise<ProductRecommendation[]> {
-      const p = getPool(envPrefix);
-      if (!p) {
-        console.warn(`[pgvector:${envPrefix}] credenciais não configuradas`);
-        return [];
-      }
-
-      const embedding = await embedDiagnosis(diagnosis);
+    async searchProducts(diagnosis, limit) {
+      const embedding = await embedText(diagnosisAsText(diagnosis));
       if (!embedding) return [];
+      return queryByEmbedding(envPrefix, embedding, limit);
+    },
 
-      const vectorLiteral = `[${embedding.join(',')}]`;
-      const table = getTableName(envPrefix);
-
-      const { rows } = await p.query(
-        `SELECT
-           id,
-           metadata->>'nome_produto' AS nome,
-           metadata->>'tipo_produto' AS tipo,
-           metadata->>'categorias' AS categorias,
-           metadata->>'marca' AS marca,
-           (metadata->>'preco_promocional')::numeric AS preco_promocional,
-           (metadata->>'preco_normal')::numeric AS preco_normal,
-           metadata->>'link_produto' AS link,
-           1 - (embedding <=> $1::vector) AS similarity
-         FROM "${table}"
-         WHERE metadata->>'situacao' = 'Ativo'
-         ORDER BY embedding <=> $1::vector ASC
-         LIMIT $2`,
-        [vectorLiteral, limit],
-      );
-
-      return rows.map((r) => ({
-        id: r.id,
-        nome: r.nome,
-        tipo: r.tipo,
-        categorias: r.categorias,
-        marca: r.marca,
-        precoPromocional: Number(r.preco_promocional),
-        precoNormal: Number(r.preco_normal),
-        link: r.link,
-        similarity: Number(r.similarity),
-      }));
+    async searchProductsForSlot(slotQuery, diagnosis, limit) {
+      // Combina a query do slot (tipo de produto) com o perfil da pele —
+      // o slot direciona a categoria, o perfil afina dentro dela.
+      const text = `Produto: ${slotQuery}\n\n${diagnosisAsText(diagnosis)}`;
+      const embedding = await embedText(text);
+      if (!embedding) return [];
+      return queryByEmbedding(envPrefix, embedding, limit);
     },
   };
 }

@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     const filePath = `fotos/${randomUUID()}.jpg`;
     const publicUrl = await uploadToSupabase(buffer, filePath, 'image/jpeg');
 
-    const resultado = await analisarImagem(buffer, landmarks, dbUser.clinicId);
+    const resultado = await analisarImagem(buffer, landmarks, dbUser.clinicId, '');
 
     const analise = await prisma.analise.create({
       data: { userId, imageUrl: publicUrl, resultado },
