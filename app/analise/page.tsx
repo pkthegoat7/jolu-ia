@@ -182,6 +182,8 @@ function AnalisePage() {
   const okFramesRef = useRef(0);
   const scanRunningRef = useRef(false);
   const capturedRef = useRef(false);
+  // Flag do auto-start de camera; resetar p/ re-anexar stream apos voltar de processing.
+  const startedRef = useRef(false);
   // Trampolim para chamar enviarAnalise dentro de onLandmarks sem ciclo de declaração.
   const enviarAnaliseRef = useRef<(b: Blob) => void>(() => {});
 
@@ -371,30 +373,32 @@ function AnalisePage() {
       }
       const data = await res.json().catch(() => ({}));
       console.error('[analise] falhou:', res.status, data);
-      setStep('scan');
-      setGuidance({ message: 'Posicione seu rosto na câmera', status: 'waiting', arrow: null });
-      setScanStatus(`Erro (${res.status}): ${data?.message ?? 'Tente novamente.'}`);
       capturedRef.current = false;
       okFramesRef.current = 0;
-      scanRunningRef.current = true;
-      void startMesh();
+      scanRunningRef.current = false;
+      // Forca o useEffect de auto-start a re-anexar o MediaStream no novo <video>
+      // ao remontar a UI de scan (caso contrario a camera fica preta/congelada).
+      startedRef.current = false;
+      setGuidance({ message: 'Posicione seu rosto na câmera', status: 'waiting', arrow: null });
+      setScanStatus(`Erro (${res.status}): ${data?.message ?? 'Tente novamente.'}`);
+      setStep('scan');
     } catch (err) {
       clearTimeout(timeoutId);
       const isAbort = (err as Error)?.name === 'AbortError';
       console.error('[analise] falha de rede:', err);
-      setStep('scan');
-      setGuidance({ message: 'Posicione seu rosto na câmera', status: 'waiting', arrow: null });
-      setScanStatus(isAbort ? 'Erro: análise demorou demais. Tente novamente.' : 'Erro ao conectar. Verifique sua internet.');
       capturedRef.current = false;
       okFramesRef.current = 0;
-      scanRunningRef.current = true;
-      void startMesh();
+      scanRunningRef.current = false;
+      startedRef.current = false;
+      setGuidance({ message: 'Posicione seu rosto na câmera', status: 'waiting', arrow: null });
+      setScanStatus(isAbort ? 'Erro: análise demorou demais. Tente novamente.' : 'Erro ao conectar. Verifique sua internet.');
+      setStep('scan');
     }
   };
   enviarAnaliseRef.current = (b: Blob) => { void enviarAnalise(b); };
 
   // Auto-liga a câmera ao entrar na etapa de scan — sem precisar clicar.
-  const startedRef = useRef(false);
+  // Tambem dispara de novo apos um erro (startedRef e resetado em enviarAnalise).
   useEffect(() => {
     if (step !== 'scan' || startedRef.current) return;
     startedRef.current = true;
