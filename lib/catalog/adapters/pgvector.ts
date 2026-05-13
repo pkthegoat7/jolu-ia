@@ -113,15 +113,26 @@ async function queryByEmbedding(
        1 - (embedding <=> $1::vector) AS similarity
      FROM "${table}"
      WHERE metadata->>'situacao' = 'Ativo'
-       AND coalesce(metadata->>'nome_produto', '') !~* '\y(kit|combo|conjunto|bundle|presente)\y'
-       AND coalesce(metadata->>'tipo_produto', '') !~* '\y(kit|combo|conjunto|bundle)\y'
-       AND coalesce(metadata->>'categorias',  '') !~* '\y(kit|combo|conjunto|bundle)\y'
+       AND coalesce(metadata->>'nome_produto', '') !~* '\\y(kit|combo|conjunto|bundle|presente)\\y'
+       AND coalesce(metadata->>'tipo_produto', '') !~* '\\y(kit|combo|conjunto|bundle)\\y'
+       AND coalesce(metadata->>'categorias',  '') !~* '\\y(kit|combo|conjunto|bundle)\\y'
      ORDER BY embedding <=> $1::vector ASC
      LIMIT $2`,
     [vectorLiteral, limit],
   );
 
-  return rows.map((r) => ({
+  // Rede de seguranca: mesmo com o filtro SQL, descarta qualquer kit que tenha escapado
+  // (ex: catalogo com situacao diferente, metadata mal formatada, etc).
+  const KIT_RE = /\b(kit|combo|conjunto|bundle|presente)\b/i;
+  const filtered = rows.filter((r) => {
+    const blob = `${r.nome ?? ''} ${r.tipo ?? ''} ${r.categorias ?? ''}`;
+    return !KIT_RE.test(blob);
+  });
+  if (filtered.length < rows.length) {
+    console.warn(`[pgvector] descartados ${rows.length - filtered.length} kit(s) que escaparam do filtro SQL`);
+  }
+
+  return filtered.map((r) => ({
     id: r.id,
     nome: r.nome,
     tipo: r.tipo,
