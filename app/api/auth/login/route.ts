@@ -31,7 +31,8 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json() as { email?: string; password?: string };
-    const { email, password } = body;
+    const password = body.password;
+    const email = body.email?.trim().toLowerCase();
 
     if (!email || !password) {
       return NextResponse.json(
@@ -40,7 +41,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    // Case-insensitive p/ tolerar emails antigos cadastrados com letras maiusculas.
+    // Novos cadastros ja sao normalizados pra lowercase no insert.
+    const user = await prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+    });
     if (!user) {
       // Constant-time delay to prevent user enumeration via timing
       await bcrypt.compare(password, '$2b$10$invalidhashfortimingprotection000000000000000000000');

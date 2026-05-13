@@ -195,10 +195,16 @@ export default function AdminDashboard() {
               </button>
             ))}
           </div>
-          <button onClick={() => router.push('/admin/clinic')}
-            className="rounded-xl border border-[#C4D2E4] bg-white px-4 py-2 text-[13px] font-semibold text-[#072C57] hover:bg-[#fdf8fb]">
-            Clínica & Catálogo →
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => router.push('/admin/users')}
+              className="rounded-xl border border-[#C4D2E4] bg-white px-4 py-2 text-[13px] font-semibold text-[#072C57] hover:bg-[#F4F7FB]">
+              Usuários →
+            </button>
+            <button onClick={() => router.push('/admin/clinic')}
+              className="rounded-xl border border-[#C4D2E4] bg-white px-4 py-2 text-[13px] font-semibold text-[#072C57] hover:bg-[#F4F7FB]">
+              Clínica & Catálogo →
+            </button>
+          </div>
         </div>
 
         {/* ── LEADS TAB ── */}
