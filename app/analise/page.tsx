@@ -13,16 +13,6 @@ type Guidance = { message: string; status: GuidanceStatus; arrow: GuidanceArrow 
 type Pose = { yaw: number; pitch: number; roll: number; faceHeight: number; cx: number; cy: number };
 type Landmark = { x: number; y: number; z: number };
 
-// Ângulos do liveness — ordem de captura. Frontal sempre primeiro (é o que vai pra IA).
-type AnguloId = 'frente' | 'esquerda' | 'direita' | 'cima' | 'baixo';
-const ANGULOS: { id: AnguloId; label: string; instr: string; arrow: GuidanceArrow }[] = [
-  { id: 'frente',    label: 'Frente',    instr: 'Olhe direto para a câmera',         arrow: null  },
-  { id: 'esquerda',  label: 'Esquerda',  instr: 'Vire o rosto lentamente p/ esquerda', arrow: 'left'  },
-  { id: 'direita',   label: 'Direita',   instr: 'Agora vire para a direita',         arrow: 'right' },
-  { id: 'cima',      label: 'Cima',      instr: 'Levante levemente o queixo',        arrow: 'up'    },
-  { id: 'baixo',     label: 'Baixo',     instr: 'Abaixe levemente o queixo',         arrow: 'down'  },
-];
-
 function computePose(lm: Landmark[] | null): Pose | null {
   if (!lm || lm.length < 454) return null;
   const nose     = lm[4];
@@ -43,25 +33,14 @@ function computePose(lm: Landmark[] | null): Pose | null {
   return { yaw, pitch, roll, faceHeight, cx: nose.x, cy: nose.y };
 }
 
-// Posicionamento básico (face centralizada, distância OK) — pré-requisito antes de qualquer ângulo.
+// Posicionamento básico (face centralizada, frontal, distância OK).
 function checkFraming(p: Pose): Guidance | null {
   if (p.faceHeight < 0.22) return { message: 'Aproxime o rosto da câmera', status: 'warn', arrow: 'in' };
   if (p.faceHeight > 0.72) return { message: 'Afaste o rosto da câmera',   status: 'warn', arrow: 'out' };
   if (Math.abs(p.roll) > 14) return { message: 'Endireite levemente a cabeça', status: 'warn', arrow: null };
+  if (Math.abs(p.yaw)  > 0.14) return { message: 'Olhe direto para a câmera', status: 'warn', arrow: null };
+  if (Math.abs(p.pitch) > 0.10) return { message: 'Olhe direto para a câmera', status: 'warn', arrow: null };
   return null;
-}
-
-// Verifica se a pose atual corresponde ao ângulo alvo. Tolerâncias geram a "zona certa".
-function matchesAngle(p: Pose, target: AnguloId): boolean {
-  const YAW_FRENTE = 0.12, YAW_LADO = 0.32;
-  const PITCH_FRENTE = 0.05, PITCH_VERT = 0.10;
-  switch (target) {
-    case 'frente':   return Math.abs(p.yaw) < YAW_FRENTE && Math.abs(p.pitch) < PITCH_FRENTE + 0.05;
-    case 'esquerda': return p.yaw > YAW_LADO;
-    case 'direita':  return p.yaw < -YAW_LADO;
-    case 'cima':     return p.pitch < -PITCH_VERT;
-    case 'baixo':    return p.pitch > PITCH_VERT;
-  }
 }
 
 // ── Guidance Overlay ──────────────────────────────────────────────────
@@ -195,22 +174,12 @@ function AnalisePage() {
   const [blurBg, setBlurBg] = useState('');
   const blurIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ── Liveness multi-ângulo ──
-  const [scanRunning, setScanRunning] = useState(false);
-  const [anguloIdx, setAnguloIdx] = useState(0);                  // qual ângulo estamos pedindo
-  const [capturados, setCapturados] = useState<Record<AnguloId, Blob | null>>({
-    frente: null, esquerda: null, direita: null, cima: null, baixo: null,
-  });
+  // ── Auto-scan (captura única quando rosto fica estável) ──
   const okFramesRef = useRef(0);
   const scanRunningRef = useRef(false);
-  const anguloIdxRef = useRef(0);
-  const capturadosRef = useRef<Record<AnguloId, Blob | null>>({
-    frente: null, esquerda: null, direita: null, cima: null, baixo: null,
-  });
-  // Anti-spoof: registra histograma de yaw/pitch ao longo do scan — se nunca variou, é foto.
-  const poseHistoryRef = useRef<{ yaw: number; pitch: number }[]>([]);
+  const capturedRef = useRef(false);
   // Trampolim para chamar enviarAnalise dentro de onLandmarks sem ciclo de declaração.
-  const enviarAnaliseRef = useRef<() => void>(() => {});
+  const enviarAnaliseRef = useRef<(b: Blob) => void>(() => {});
 
   const captureBlurFrame = useCallback(() => {
     const video = videoRef.current;
@@ -244,15 +213,14 @@ function AnalisePage() {
 
   const onFace = useCallback((d: boolean) => setFaceDet(d), []);
   const onLandmarks = useCallback((lm: Landmark[] | null) => {
+    if (capturedRef.current) return;
+
     const pose = computePose(lm);
     if (!pose) {
       setGuidance({ message: 'Posicione seu rosto na câmera', status: 'waiting', arrow: null });
       okFramesRef.current = 0;
       return;
     }
-
-    poseHistoryRef.current.push({ yaw: pose.yaw, pitch: pose.pitch });
-    if (poseHistoryRef.current.length > 200) poseHistoryRef.current.shift();
 
     const framingErr = checkFraming(pose);
     if (framingErr) {
@@ -262,48 +230,35 @@ function AnalisePage() {
     }
 
     if (!scanRunningRef.current) {
-      // Modo aguardando — só checa enquadramento.
-      setGuidance({ message: 'Pronto. Clique em "Iniciar Escaneamento" quando estiver à vontade', status: 'ok', arrow: null });
+      setGuidance({ message: 'Pronto — segure por um instante...', status: 'ok', arrow: null });
       okFramesRef.current = 0;
       return;
     }
 
-    const target = ANGULOS[anguloIdxRef.current];
-    if (!target) return;
+    okFramesRef.current += 1;
+    // Precisa segurar a pose ~15 frames (~1s a 15fps) para considerar estável.
+    const FRAMES_NEEDED = 15;
+    const remaining = Math.max(0, FRAMES_NEEDED - okFramesRef.current);
+    setGuidance({
+      message: remaining > 0 ? `Segure assim... capturando em ${Math.ceil(remaining / 15)}s` : 'Capturando',
+      status: 'ok',
+      arrow: null,
+    });
 
-    if (matchesAngle(pose, target.id)) {
-      okFramesRef.current += 1;
-      setGuidance({ message: `Segura assim... (${target.label})`, status: 'ok', arrow: null });
-      // Precisa segurar a pose ~8 frames (~0.5s a 15fps) para considerar estável.
-      if (okFramesRef.current >= 8 && !capturadosRef.current[target.id]) {
-        // Marca já pra evitar dupla captura na próxima animação.
-        capturadosRef.current[target.id] = new Blob();
-        captureFrameBlob().then((blob) => {
-          if (!blob) {
-            capturadosRef.current[target.id] = null;
-            return;
-          }
-          capturadosRef.current[target.id] = blob;
-          setCapturados({ ...capturadosRef.current });
+    if (okFramesRef.current >= FRAMES_NEEDED) {
+      capturedRef.current = true;
+      scanRunningRef.current = false;
+      captureFrameBlob().then((blob) => {
+        if (!blob) {
+          capturedRef.current = false;
+          scanRunningRef.current = true;
           okFramesRef.current = 0;
-          // Avança ângulo
-          const next = anguloIdxRef.current + 1;
-          if (next < ANGULOS.length) {
-            anguloIdxRef.current = next;
-            setAnguloIdx(next);
-          } else {
-            // Todos capturados — dispara envio.
-            scanRunningRef.current = false;
-            setScanRunning(false);
-            enviarAnaliseRef.current();
-          }
-        });
-      }
-    } else {
-      okFramesRef.current = 0;
-      setGuidance({ message: target.instr, status: 'warn', arrow: target.arrow });
+          setScanStatus('Falha ao capturar frame. Tentando novamente...');
+          return;
+        }
+        enviarAnaliseRef.current(blob);
+      });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [captureFrameBlob]);
 
   const { start: startMesh, stop: stopMesh, getLandmarks } = useFaceMesh(videoRef, canvasRef, onFace, onLandmarks);
@@ -350,72 +305,38 @@ function AnalisePage() {
   };
 
   // ── Camera helpers ────────────────────────────────────────────────
-  const startVideo = async () => {
+  const startVideo = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         if (sharpVideoRef.current) sharpVideoRef.current.srcObject = stream;
         setCamOn(true);
-        scanRunningRef.current = false;
-        setScanRunning(false);
+        capturedRef.current = false;
         okFramesRef.current = 0;
         setGuidance({ message: 'Posicione seu rosto na câmera', status: 'waiting', arrow: null });
         setBlurBg('');
         if (blurIntervalRef.current) clearInterval(blurIntervalRef.current);
-        setScanStatus('Carregando Face Mesh...');
+        setScanStatus('Carregando reconhecimento facial...');
         await startMesh();
         setMeshReady(true);
-        setScanStatus('Posicione seu rosto no centro e clique em Analisar.');
+        setScanStatus('');
+        // Auto-inicia o scan assim que o mesh está pronto — não precisa de clique.
+        scanRunningRef.current = true;
         setTimeout(captureBlurFrame, 400);
         blurIntervalRef.current = setInterval(captureBlurFrame, 4000);
       }
     } catch {
       setScanStatus('Erro ao acessar câmera. Verifique as permissões.');
     }
-  };
+  }, [startMesh, captureBlurFrame]);
 
-  const iniciarScan = () => {
-    // Reset state e arranca a coleta a partir do ângulo "frente".
-    capturadosRef.current = { frente: null, esquerda: null, direita: null, cima: null, baixo: null };
-    setCapturados({ ...capturadosRef.current });
-    anguloIdxRef.current = 0;
-    setAnguloIdx(0);
-    okFramesRef.current = 0;
-    poseHistoryRef.current = [];
-    scanRunningRef.current = true;
-    setScanRunning(true);
-    setScanStatus('');
-  };
-
-  const enviarAnalise: () => Promise<void> = async () => {
-    // Anti-spoof: variação mínima de yaw entre captures (foto retornaria ~0).
-    const yaws = poseHistoryRef.current.map((p) => p.yaw);
-    const range = Math.max(...yaws) - Math.min(...yaws);
-    if (range < 0.3) {
-      scanRunningRef.current = false;
-      setScanRunning(false);
-      setScanStatus('Não detectamos movimento real do rosto. Tente novamente.');
-      return;
-    }
-
-    const frente = capturadosRef.current.frente;
-    if (!frente) {
-      setScanStatus('Frame frontal ausente. Reinicie o escaneamento.');
-      return;
-    }
-
+  const enviarAnalise = async (frame: Blob) => {
     setStep('processing');
     stopMesh();
 
     const fd = new FormData();
-    fd.append('image_front', frente, 'scan-frente.jpg');
-    // Compat: o backend ainda lê 'image' como fallback.
-    fd.append('image', frente, 'scan.jpg');
-    for (const ang of ['esquerda','direita','cima','baixo'] as AnguloId[]) {
-      const blob = capturadosRef.current[ang];
-      if (blob) fd.append(`image_${ang}`, blob, `scan-${ang}.jpg`);
-    }
+    fd.append('image', frame, 'scan.jpg');
     fd.append('analysisToken', analysisToken);
     const lm = getLandmarks();
     if (lm) fd.append('landmarks', JSON.stringify(lm));
@@ -428,15 +349,29 @@ function AnalisePage() {
         const data = await res.json().catch(() => ({}));
         setStep('scan');
         setScanStatus(data?.message ?? 'Erro na análise. Tente novamente.');
+        capturedRef.current = false;
+        okFramesRef.current = 0;
+        scanRunningRef.current = true;
         startMesh();
       }
     } catch {
       setStep('scan');
       setScanStatus('Erro ao conectar. Tente novamente.');
+      capturedRef.current = false;
+      okFramesRef.current = 0;
+      scanRunningRef.current = true;
       startMesh();
     }
   };
-  enviarAnaliseRef.current = () => { void enviarAnalise(); };
+  enviarAnaliseRef.current = (b: Blob) => { void enviarAnalise(b); };
+
+  // Auto-liga a câmera ao entrar na etapa de scan — sem precisar clicar.
+  const startedRef = useRef(false);
+  useEffect(() => {
+    if (step !== 'scan' || startedRef.current) return;
+    startedRef.current = true;
+    void startVideo();
+  }, [step, startVideo]);
 
   // ── Render: validating ────────────────────────────────────────────
   if (step === 'validating') {
@@ -569,40 +504,14 @@ function AnalisePage() {
 
         {/* Heading */}
         <div className="fu w-full">
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-[#b96f8d]">Escaneamento Facial · Liveness</p>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-[#b96f8d]">Escaneamento Facial</p>
           <h2 className="font-display text-[2rem] font-light text-[#4a2435] leading-tight">
-            {scanRunning
-              ? <>Vire o rosto <span style={{ fontStyle: 'italic', color: '#7a3f56' }}>devagar</span>.</>
-              : <>Posicione seu rosto <span style={{ fontStyle: 'italic', color: '#7a3f56' }}>no centro</span>.</>}
+            Posicione seu rosto <span style={{ fontStyle: 'italic', color: '#7a3f56' }}>no centro</span>.
           </h2>
           <p className="mt-1 text-sm text-[#9a7282]">
-            {scanRunning
-              ? 'O sistema captura sozinho conforme você gira o rosto. Não precisa clicar.'
-              : 'Quando estiver pronta, clique para iniciar o escaneamento de prova de vida.'}
+            A captura acontece automaticamente quando o rosto estiver bem enquadrado. Não precisa apertar nada.
           </p>
         </div>
-
-        {/* Progress dots — só aparece durante o scan */}
-        {scanRunning && (
-          <div className="w-full flex items-center justify-center gap-3 py-1">
-            {ANGULOS.map((a, i) => {
-              const done = !!capturados[a.id];
-              const active = i === anguloIdx && !done;
-              return (
-                <div key={a.id} className="flex flex-col items-center gap-1.5">
-                  <div className={`h-3 w-3 rounded-full transition-all duration-300 ${
-                    done ? 'bg-emerald-500 scale-110'
-                      : active ? 'bg-[#b96f8d] ring-4 ring-[#b96f8d]/25 animate-pulse'
-                      : 'bg-[#e8d0db]'
-                  }`} />
-                  <span className={`text-[9px] font-semibold uppercase tracking-wider ${
-                    done ? 'text-emerald-600' : active ? 'text-[#7a3f56]' : 'text-[#c4a0b8]'
-                  }`}>{a.label}</span>
-                </div>
-              );
-            })}
-          </div>
-        )}
 
         {/* Camera box */}
         <div className="fu1 w-full relative rounded-2xl overflow-hidden"
@@ -656,17 +565,15 @@ function AnalisePage() {
           </div>
         </div>
 
-        {/* Buttons */}
-        <div className="fu2 w-full flex gap-3">
-          <button onClick={startVideo}
-            className="btn-ghost flex-1 rounded-2xl py-3.5 text-sm font-semibold">
-            {camOn ? 'Reiniciar' : 'Ligar Câmera'}
-          </button>
-          <button onClick={iniciarScan} disabled={!camOn || scanRunning || guidance.status !== 'ok'}
-            className="btn-brand flex-[2] rounded-2xl py-3.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50">
-            {scanRunning ? 'Escaneando…' : 'Iniciar Escaneamento →'}
-          </button>
-        </div>
+        {/* Reiniciar — só aparece se houve falha após câmera ligada */}
+        {camOn && scanStatus.includes('Erro') && (
+          <div className="fu2 w-full">
+            <button onClick={() => { startedRef.current = false; void startVideo(); }}
+              className="btn-ghost w-full rounded-2xl py-3.5 text-sm font-semibold">
+              Tentar novamente
+            </button>
+          </div>
+        )}
 
         {scanStatus && !meshReady && (
           <p className={`fu3 w-full flex items-center gap-2 text-[13px] font-medium ${scanStatus.includes('Erro') ? 'text-red-500' : 'text-[#8a6070]'}`}>
